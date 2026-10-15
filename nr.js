@@ -9,11 +9,12 @@
     addrWhere: 'us', addrUS: {}, addrAbroad: {},
     wagesW2: '', fedWithheldW2: '', ssTaxW2: '', medTaxW2: '',
     wages1042: '', withheld1042: '', scholarshipTaxable: '',
+    stCode: '', stWages: '', stWithheld: '', livedState: '', nyForeignAcct: 'no', nyLivingQuarters: 'no',
     treatyCountry: '', citizenship: '', taxResidence: '', treatyMonthsPrior: '0',
     tripsText: '', appliedGreenCard: 'no', everGreenCard: 'no', changedStatus: 'no',
     changeDetail: '', filedBefore: 'no', priorFiling: '', treatyForeignTaxed: 'no', tin: ''
   };
-  var step = 0, residency = null, calc = null, pdfUrl = null;
+  var step = 0, residency = null, calc = null, pdfUrl = null, det = null, stateRes = null;
 
   function el(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; }
   function field(label, name, val, opts) {
@@ -63,6 +64,7 @@
     app.appendChild(wrap);
   }
   function money(n) { return '$' + Math.round(n).toLocaleString('en-US'); }
+  var US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 
   function next() {
     if (step === 0) step = 1;
@@ -98,8 +100,13 @@
       calc = computeNR(d);
       step = 5;
     }
-    else if (step === 5) step = 6;
-    else if (step === 6) { generate(); return; }
+    else if (step === 5) {
+      det = stateDetermination(d, calc);
+      stateRes = det.action === 'prepare' ? stateCalc(det.state, d, calc) : null;
+      step = 6;
+    }
+    else if (step === 6) step = 7;
+    else if (step === 7) { generate(); return; }
     render();
   }
 
@@ -115,7 +122,7 @@
         false);
     }
     if (step === 1) {
-      shell('Step 1 of 5: your residency for 2025',
+      shell('Step 1 of 6: your residency for 2025',
         '<p class="note">' + 'We never ask if you were "exempt". We work it out from your visa and your years, the way the IRS rules do.' + '</p>' +
         sel('Your visa type on December 31, 2025', 'visaNow', d.visaNow, [['F-1', 'F-1 student'], ['F-2', 'F-2'], ['J-1', 'J-1 exchange visitor'], ['J-2', 'J-2'], ['other', 'Something else']]) +
         sel('Do you have a green card (or one pending that was approved)?', 'greenCard', d.greenCard, [['no', 'No'], ['yes', 'Yes']]) +
@@ -128,7 +135,7 @@
     }
     if (step === 2) {
       var us = d.addrWhere === 'us';
-      shell('Step 2 of 5: about you',
+      shell('Step 2 of 6: about you',
         field('First name and middle initial', 'firstName', d.firstName) +
         field('Last name (family name)', 'lastName', d.lastName) +
         sel('Filing status', 'status', d.status, [['single', 'Single'], ['mfs', 'Married filing separately']]) +
@@ -145,13 +152,18 @@
       if (aw) aw.onchange = function () { d.addrWhere = aw.value; render(); };
     }
     if (step === 3) {
-      shell('Step 3 of 5: your documents',
+      shell('Step 3 of 6: your documents',
         '<p class="note">Copy the numbers from your forms. If you have several W-2s, add their boxes together. Leave a section at zero if you do not have that form.</p>' +
         '<h3>Form W-2 (add up all of them)</h3>' +
         field('Box 1: wages, tips, other compensation', 'wagesW2', d.wagesW2, { inputmode: 'decimal' }) +
         field('Box 2: federal income tax withheld', 'fedWithheldW2', d.fedWithheldW2, { inputmode: 'decimal' }) +
         field('Box 4: Social Security tax withheld', 'ssTaxW2', d.ssTaxW2, { inputmode: 'decimal' }) +
         field('Box 6: Medicare tax withheld', 'medTaxW2', d.medTaxW2, { inputmode: 'decimal' }) +
+        '<h3>The state line on your W-2 (boxes 15 to 17)</h3>' +
+        '<p class="note">Most W-2s have one state line. If yours shows two states, enter the one where you did most of your work and check the other state on the states page.</p>' +
+        sel('Box 15: state', 'stCode', d.stCode, [['', 'No state line / no state tax']].concat(US_STATES.map(function (s) { return [s, s]; }))) +
+        field('Box 16: state wages', 'stWages', d.stWages, { inputmode: 'decimal' }) +
+        field('Box 17: state tax withheld', 'stWithheld', d.stWithheld, { inputmode: 'decimal' }) +
         '<h3>Form 1042-S (if you received one)</h3>' +
         field('Gross income from the 1042-S (wages or scholarship paid under a treaty setup)', 'wages1042', d.wages1042, { inputmode: 'decimal' }) +
         field('Federal tax withheld on the 1042-S', 'withheld1042', d.withheld1042, { inputmode: 'decimal' }) +
@@ -160,7 +172,7 @@
         true);
     }
     if (step === 4) {
-      shell('Step 4 of 5: treaty and Schedule OI details',
+      shell('Step 4 of 6: treaty and Schedule OI details',
         sel('Your tax treaty country (residence country with a US treaty claim)', 'treatyCountry', d.treatyCountry,
           [['', 'No treaty claim'], ['China', 'China (students: $5,000 of wages exempt)'], ['India', 'India (students: standard deduction allowed)'], ['other', 'Another country (not covered yet)']]) +
         field('Months you claimed this treaty benefit in earlier years (0 if none)', 'treatyMonthsPrior', d.treatyMonthsPrior, { type: 'number', inputmode: 'numeric' }) +
@@ -193,13 +205,33 @@
           : '<p class="verdict">No refund and nothing owed. You still have to file.</p>');
       var fica = calc.ficaFlag
         ? '<p class="note"><strong>Possible extra refund:</strong> your W-2 shows ' + money(calc.ficaWithheld) + ' of Social Security and Medicare tax. Most F-1 and J-1 nonresident students do not owe those taxes. First ask your employer to refund them. If the employer will not, you can claim them from the IRS with Form 843 and Form 8316. This return does not claim them, and they are not in the numbers above.</p>' : '';
-      shell('Step 5 of 5: your result for 2025',
+      shell('Step 5 of 6: your federal result for 2025',
         '<p class="note">' + residency.why + '</p>' +
         '<table class="lines">' + rows + '</table>' + verdict + fica +
         '<p class="note">Check the numbers against your W-2 and 1042-S before you continue. One step left: your SSN or ITIN, asked only now, used only inside the PDF made on this device.</p>',
         true);
     }
     if (step === 6) {
+      var stBody;
+      if (det.action === 'prepare') {
+        var sf = STATE_FORMS[det.state];
+        var verdict = stateRes.refund > 0 ? '<p class="verdict good">' + det.state + ' refund: ' + money(stateRes.refund) + '</p>'
+          : (stateRes.owed > 0 ? '<p class="verdict bad">' + det.state + ' amount owed: ' + money(stateRes.owed) + '</p>' : '<p class="verdict">' + det.state + ': no refund, nothing owed.</p>');
+        stBody = '<p>' + det.reason + '</p>' +
+          '<table class="lines"><tr><td>' + sf.form + ' tax</td><td class="num">' + money(stateRes.tax) + '</td></tr>' +
+          '<tr><td>' + det.state + ' tax already withheld</td><td class="num">' + money(stateRes.payments) + '</td></tr></table>' + verdict +
+          '<p class="note">The state return goes in its OWN envelope to the state, never to the IRS. Your package includes a separate state mailing slip with the right address (' + sf.agency + ', deadline ' + sf.deadline + ').</p>' +
+          (det.state === 'NY' ? sel('Do you have a bank or financial account in another country?', 'nyForeignAcct', d.nyForeignAcct, [['no', 'No'], ['yes', 'Yes']]) +
+            sel('Did you keep an apartment or other living quarters in New York State during 2025?', 'nyLivingQuarters', d.nyLivingQuarters, [['no', 'No'], ['yes', 'Yes']]) +
+            '<p class="note">If you kept living quarters in New York and spent 183 or more days there, New York may treat you as a resident for tax. If that is you, talk to a tax advisor before filing this nonresident return.</p>' : '');
+      } else if (det.action === 'prepare-refund-only') {
+        stBody = '<p>' + det.reason + '</p><p class="note">This version prepares CA, NY, MA and IL. For ' + det.state + ', use the worksheet numbers in your summary page with that state\'s own nonresident form to claim the withholding back.</p>';
+      } else {
+        stBody = '<p>' + det.reason + '</p>';
+      }
+      shell('Step 6 of 6: your state return', stBody, true);
+    }
+    if (step === 7) {
       shell('Last step: your SSN or ITIN',
         '<p class="note">Asked last, on purpose. It is typed into the PDF on this device only.</p>' +
         '<label class="field"><span>SSN or ITIN</span><input name="tin" type="password" inputmode="numeric" autocomplete="off" value=""></label>',
@@ -222,6 +254,15 @@
         var bS1 = await (await fetch('assets/f1040s1.pdf')).arrayBuffer();
         docs.push(await fillSchedule1(PDFLib, bS1, d, calc));
       }
+      if (det && det.action === 'prepare' && stateRes) {
+        docs.push(await buildStateSlip(PDFLib, det.state, d, stateRes));
+        var asset = { CA: 'assets/ca-540nr.pdf', NY: 'assets/ny-it203.pdf', MA: 'assets/ma-1nrpy.pdf', IL: 'assets/il-1040.pdf' }[det.state];
+        var bSt = await (await fetch(asset)).arrayBuffer();
+        if (det.state === 'CA') docs.push(await fillCA(PDFLib, bSt, d, stateRes));
+        if (det.state === 'NY') docs.push(await fillNY(PDFLib, bSt, d, stateRes));
+        if (det.state === 'MA') docs.push(await fillMA(PDFLib, bSt, d, stateRes));
+        if (det.state === 'IL') docs.push(await fillIL(PDFLib, bSt, d, stateRes, calc));
+      }
       var out = await PDFLib.PDFDocument.create();
       for (var i = 0; i < docs.length; i++) {
         var pages = await out.copyPages(docs[i], docs[i].getPageIndices());
@@ -238,7 +279,9 @@
       var wrap = el('<section class="card"></section>');
       wrap.appendChild(el('<h2>Your 1040-NR package is ready</h2>'));
       wrap.appendChild(el('<div><p>The PDF has your mailing slip first, then a summary, then the filled Form 1040-NR and Schedule OI' +
-        (calc.line8 > 0 ? ', plus Schedule 1 for your scholarship' : '') + '.</p>' + owedNote +
+        (calc.line8 > 0 ? ', plus Schedule 1 for your scholarship' : '') +
+        ((det && det.action === 'prepare') ? ', and after those, your ' + det.state + ' state return behind its own mailing slip' : '') + '.</p>' + owedNote +
+        ((det && det.action === 'prepare') ? '<p><strong>The state return goes in a separate envelope to the state address on its slip. Never mail it to the IRS.</strong></p>' : '') +
         '<p><strong>Print it, sign and date page 2 of the 1040-NR, attach Copy B of each W-2 and Copy C of each 1042-S behind the return, and mail it by April 15, 2026.</strong> Keep a copy of everything.</p></div>'));
       var a = el('<a class="btn" download="my1040nr-1040nr-2025.pdf">Download your PDF</a>');
       a.href = pdfUrl;
@@ -248,7 +291,7 @@
       wrap.appendChild(erase);
       app.appendChild(wrap);
     } catch (err) {
-      message('Something went wrong', '<p>The PDF could not be built. Your answers are still on this page: go back and try again. If it keeps failing, the offline copy from GitHub runs the same code.</p>', 'Back', function () { step = 6; render(); });
+      message('Something went wrong', '<p>The PDF could not be built. Your answers are still on this page: go back and try again. If it keeps failing, the offline copy from GitHub runs the same code.</p>', 'Back', function () { step = 7; render(); });
     }
   }
 
@@ -268,6 +311,13 @@
       page.drawText('Prepared with My1040NR, rules version ' + NR_RULES_VERSION + '. Free and open source: my1040nr.com', { x: 56, y: 48, size: 8.5, font: font });
       return doc;
     });
+  }
+  function stateWorksheet(st, s) {
+    if (st === 'CA') return 'California income ' + money(s.caAGI) + ' of ' + money(s.totalAll) + ' total (treaty wages added back for California).';
+    if (st === 'NY') return 'New York income ' + money(s.nysAGI) + ' of ' + money(s.fedAGI) + ' federal (' + (s.pct * 100).toFixed(1) + '% allocated). Household credit not claimed.';
+    if (st === 'MA') return 'Massachusetts income ' + money(s.maIncome) + ' of ' + money(s.totalIncome) + ' total; exemption prorated to ' + money(s.exemption) + (s.ficaDed ? '; FICA deduction ' + money(s.ficaDed) : '') + '.';
+    if (st === 'IL') return 'Illinois income ' + money(s.ilIncome) + '; prorated exemption ' + money(s.exemption) + '; net ' + money(s.net) + ' at 4.95%. These are your Schedule NR numbers.';
+    return '';
   }
   function buildReturnSlip(PDFLib, d, c) {
     var owed = c.owed > 0;
@@ -297,6 +347,38 @@
       'Use USPS and keep the postmark receipt. This slip is not an IRS form.'
     ].filter(function (x) { return x !== ''; }));
   }
+  function buildStateSlip(PDFLib, st, d, s) {
+    var sf = STATE_FORMS[st];
+    var owe = s.owed > 0;
+    var notes = {
+      CA: 'California does not honor the federal treaty exemption: treaty-exempt wages were added back on line 16. Schedule CA (540NR) is not attached in this version; if the FTB asks for it, your California amounts are on the summary worksheet in this package.',
+      NY: 'New York household credit (up to $75 for many students) is not claimed in this version. As a New York nonresident you owe no New York City income tax.',
+      MA: 'Massachusetts amounts are entered as Massachusetts source income, the way Form 1-NR/PY asks nonresidents to report. Your exemption was prorated on line 22 using the line 14g ratio. Enclose Schedule HC if it applies to you.',
+      IL: 'Schedule NR is not attached in this version. Your Schedule NR numbers are on the summary worksheet in this package; if Illinois asks for the schedule, copy them in.'
+    }[st];
+    return textPage(PDFLib, 'State mailing slip: ' + sf.form + ' (' + st + ', 2025)', [
+      '#SEPARATE ENVELOPE',
+      'This state return goes in its OWN envelope to the state. Never mail it to the IRS, and never mail your federal return to the state.',
+      '',
+      '#MAIL THIS STATE PACKAGE TO',
+      owe ? sf.addrOwe : sf.addrRefund,
+      '',
+      '#DEADLINE',
+      'Postmark by ' + sf.deadline + '.',
+      '',
+      '#IN THIS ENVELOPE',
+      '1. This slip (not a state form, just your guide).',
+      '2. The filled ' + sf.form + ', signed and dated.',
+      '3. A copy of your federal return and your W-2 (states ask for these; include copies, not originals).',
+      owe ? '4. Payment: pay online at the state tax website if you can; otherwise a check payable per the form instructions, with your SSN and "2025 ' + sf.form + '" written on it.' : '',
+      '',
+      '#YOUR NUMBERS',
+      st + ' tax: ' + money(s.tax) + '. Withheld: ' + money(s.payments) + '. ' + (s.refund > 0 ? 'Refund: ' + money(s.refund) + '.' : (s.owed > 0 ? 'You owe: ' + money(s.owed) + '.' : 'Nothing owed, no refund.')),
+      '',
+      '#NOTE',
+      notes
+    ].filter(function (x) { return x !== ''; }));
+  }
   function buildSummary(PDFLib, d, c, res) {
     return textPage(PDFLib, 'Your 2025 summary (not an IRS form)', [
       '#RESULT',
@@ -315,7 +397,9 @@
       c.ficaFlag ? 'Your W-2 withheld ' + money(c.ficaWithheld) + ' of Social Security and Medicare tax. As an F or J nonresident you likely did not owe it. Ask your employer for it back first; if they refuse, file Form 843 with Form 8316 to claim it from the IRS. It is separate from this return.' : '',
       '',
       '#STATE TAXES',
-      'This package is federal only. Many students also owe a state return: check the free state checker at my1040nr.com/states.',
+      (det && det.action === 'prepare' && stateRes)
+        ? det.state + ' return prepared in this package: tax ' + money(stateRes.tax) + ', withheld ' + money(stateRes.payments) + ', ' + (stateRes.refund > 0 ? 'refund ' + money(stateRes.refund) : (stateRes.owed > 0 ? 'owed ' + money(stateRes.owed) : 'even')) + '. Mail it separately to the state. Worksheet: ' + stateWorksheet(det.state, stateRes)
+        : (det ? det.reason : 'No state determination was made.'),
       '',
       '#A COPY FOR YOU',
       'Keep this summary and a copy of the signed return for at least 3 years.'

@@ -258,6 +258,7 @@ function computeNR(d) {
   var payments = num(d.fedWithheldW2) + num(d.withheld1042);
   var ficaWithheld = num(d.ssTaxW2) + num(d.medTaxW2);
   return {
+    grossWages: line1a,
     line1a: line1a, line1k: line1k, line1z: line1z, line8: line8, line9: line9,
     line11a: line9, line12: line12, line14: line12, line15: taxable, line16: tax,
     line24: tax, line25a: num(d.fedWithheldW2), line25g: num(d.withheld1042),
@@ -356,5 +357,333 @@ async function fillSchedule1(PDFLib, s1Bytes, d, c) {
   T(S1 + 'f1_37[0]', Math.round(c.line8)); /* line 9 */
   T(S1 + 'f1_38[0]', Math.round(c.line8)); /* line 10 */
   form.flatten();
+  return doc;
+}
+
+/* ================= State pipeline v1 (tax year 2025) =================
+   Full preparation: CA (540NR), NY (IT-203), MA (Form 1-NR/PY), IL (IL-1040).
+   Figures marked TODO_VERIFY must be checked against each state's official
+   2025 booklet before public reliance. Sources: FTB 540NR booklet, NY IT-203
+   instructions, MA Form 1-NR/PY instructions, IL-1040 and Schedule NR
+   instructions. State-source rule used throughout: the W-2 state row
+   (boxes 15-17) defines state wages and state withholding; taxable
+   scholarship is treated as sourced to the prepared state and disclosed on
+   the worksheet. California and Massachusetts do not honor the federal
+   treaty wage exemption: exempt wages are added back for state totals. */
+
+var NO_TAX_STATES = ['AK', 'FL', 'NV', 'NH', 'SD', 'TN', 'TX', 'WA', 'WY'];
+var PREP_STATES = ['CA', 'NY', 'MA', 'IL'];
+
+function stateDetermination(d, c) {
+  var st = (d.stCode || '').toUpperCase();
+  var out = { state: st, action: 'none', reason: '' };
+  if (!st) { out.reason = 'No W-2 state row was entered, so no state return is prepared. If you worked in a state with an income tax, check the state checker on this site.'; return out; }
+  if (NO_TAX_STATES.indexOf(st) >= 0) { out.action = 'notax'; out.reason = st + ' has no state income tax on wages, so there is no state return to file for this income.'; return out; }
+  if (PREP_STATES.indexOf(st) >= 0 && num(d.stWages) > 0) {
+    out.action = 'prepare'; out.reason = 'You have ' + st + ' wages on your W-2, so a ' + st + ' nonresident return is prepared in this package.';
+    return out;
+  }
+  if (num(d.stWithheld) > 0) { out.action = 'prepare-refund-only'; out.reason = st + ' tax was withheld from your pay. Filing a ' + st + ' return is usually the only way to get it back, even when no return is otherwise required.'; return out; }
+  out.action = 'worksheet';
+  out.reason = 'No ' + st + ' return is prepared by this version. Use the worksheet numbers in this package with the ' + st + ' nonresident form, and check the filing thresholds on the state checker page.';
+  return out;
+}
+
+var CA_BRACKETS_2025 = [[10749, .01], [25499, .02], [40245, .04], [55866, .06], [70606, .08], [349137, .093], [418961, .103], [698271, .113], [Infinity, .123]]; /* TODO_VERIFY */
+function caTax(income) {
+  var prev = 0, tax = 0;
+  for (var i = 0; i < CA_BRACKETS_2025.length; i++) { if (income > prev) { tax += (Math.min(income, CA_BRACKETS_2025[i][0]) - prev) * CA_BRACKETS_2025[i][1]; prev = CA_BRACKETS_2025[i][0]; } }
+  return Math.round(tax);
+}
+function computeCA(d, c) {
+  var sd = 5537; /* CA standard deduction, single/MFS 2025. TODO_VERIFY */
+  var totalAll = c.line9 + c.exemptAmt;             /* treaty wages added back */
+  var caAGI = num(d.stWages) + num(d.scholarshipTaxable) + (c.grossWages > 0 ? c.exemptAmt * (num(d.stWages) / c.grossWages) : 0);
+  var l13 = c.line11a, l16 = c.exemptAmt, l17 = l13 + l16;
+  var l19 = Math.max(0, l17 - sd);
+  var l31 = caTax(l19);
+  var dedShare = l17 > 0 ? sd * (caAGI / l17) : 0;
+  var l35 = Math.max(0, Math.round(caAGI - dedShare));
+  var rate = l19 > 0 ? l31 / l19 : 0;
+  var l37 = Math.round(l35 * rate);
+  var pct = l19 > 0 ? l35 / l19 : 0;
+  var l39 = Math.round(153 * pct);                   /* prorated personal exemption credit, $153 for 2025 */
+  var tax = Math.max(0, l37 - l39);
+  var pay = num(d.stWithheld);
+  return { l11: 153, l12: num(d.stWages), l13: l13, l16: l16, l17: l17, l18: sd, l19: l19, l31: l31, l35: l35,
+    rate: rate, l37: l37, pct: pct, l39: l39, l40: tax, tax: tax, payments: pay,
+    refund: pay > tax ? pay - tax : 0, owed: tax > pay ? tax - pay : 0, caAGI: Math.round(caAGI), totalAll: totalAll };
+}
+
+var NY_BRACKETS_2025 = [[8500, .04], [11700, .045], [13900, .0525], [80650, .055], [215400, .06], [1077550, .0685], [5000000, .0965], [25000000, .103], [Infinity, .109]]; /* TODO_VERIFY */
+function nyTax(income) {
+  var prev = 0, tax = 0;
+  for (var i = 0; i < NY_BRACKETS_2025.length; i++) { if (income > prev) { tax += (Math.min(income, NY_BRACKETS_2025[i][0]) - prev) * NY_BRACKETS_2025[i][1]; prev = NY_BRACKETS_2025[i][0]; } }
+  return Math.round(tax);
+}
+function computeNY(d, c) {
+  var sd = 8000; /* NY standard deduction, single 2025 */
+  var fedWages = c.line1z, fedOther = c.line8, fedAGI = c.line11a;
+  var nysWages = num(d.stWages), nysOther = num(d.scholarshipTaxable);
+  var nysAGI = nysWages + nysOther;
+  var l34 = Math.max(0, fedAGI - sd);
+  var tax38 = nyTax(l34);
+  var pct = fedAGI > 0 ? Math.min(1, nysAGI / fedAGI) : 0;
+  var tax = Math.round(tax38 * pct);
+  var pay = num(d.stWithheld);
+  return { fedWages: fedWages, fedOther: fedOther, fedTotal: c.line9, fedAGI: fedAGI, nysWages: nysWages, nysOther: nysOther,
+    nysAGI: nysAGI, sd: sd, l34: l34, l36: l34, tax38: tax38, pct: pct, tax: tax, payments: pay,
+    refund: pay > tax ? pay - tax : 0, owed: tax > pay ? tax - pay : 0 };
+}
+
+function computeMA(d, c) {
+  var maIncome = num(d.stWages) + num(d.scholarshipTaxable);
+  var totalIncome = c.line1a + c.line8;              /* gross wages incl. treaty-exempt, plus scholarship */
+  var ratio = totalIncome > 0 ? Math.min(1, maIncome / totalIncome) : 0;
+  var ficaDed = Math.min(2000, num(d.ssTaxW2) + num(d.medTaxW2)); /* MA line 15a deduction */
+  var afterDed = Math.max(0, maIncome - ficaDed);
+  var exemption = Math.round(4400 * ratio);          /* personal exemption $4,400 single, prorated (line 22) */
+  var taxable = Math.max(0, afterDed - exemption);
+  var tax = Math.round(taxable * 0.05);
+  var pay = num(d.stWithheld);
+  return { maIncome: maIncome, totalIncome: totalIncome, ratio: ratio, ficaDed: ficaDed, afterDed: afterDed,
+    exemption: exemption, taxable: taxable, tax: tax, payments: pay,
+    refund: pay > tax ? pay - tax : 0, owed: tax > pay ? tax - pay : 0 };
+}
+
+function computeIL(d, c) {
+  var ilIncome = num(d.stWages) + num(d.scholarshipTaxable);
+  var totalBase = c.line11a;
+  var ratio = totalBase > 0 ? Math.min(1, ilIncome / totalBase) : 0;
+  var exemption = Math.round(2850 * ratio);          /* IL exemption allowance 2025. TODO_VERIFY */
+  var net = Math.max(0, ilIncome - exemption);
+  var tax = Math.round(net * 0.0495);
+  var pay = num(d.stWithheld);
+  return { ilIncome: ilIncome, totalBase: totalBase, ratio: ratio, exemption: exemption, net: net,
+    tax: tax, payments: pay, refund: pay > tax ? pay - tax : 0, owed: tax > pay ? tax - pay : 0 };
+}
+
+function stateCalc(st, d, c) {
+  if (st === 'CA') return computeCA(d, c);
+  if (st === 'NY') return computeNY(d, c);
+  if (st === 'MA') return computeMA(d, c);
+  if (st === 'IL') return computeIL(d, c);
+  return null;
+}
+var STATE_FORMS = {
+  CA: { form: 'Form 540NR', agency: 'California Franchise Tax Board', addrRefund: 'Franchise Tax Board, PO Box 942840, Sacramento, CA 94240-0001', addrOwe: 'Franchise Tax Board, PO Box 942867, Sacramento, CA 94267-0001', deadline: 'April 15, 2026 (California gives an automatic extension to October 15, 2026 to file, not to pay)' },
+  NY: { form: 'Form IT-203', agency: 'New York State Tax Department', addrRefund: 'State Processing Center, PO Box 61000, Albany, NY 12261-0001', addrOwe: 'State Processing Center, PO Box 61000, Albany, NY 12261-0001', deadline: 'April 15, 2026' },
+  MA: { form: 'Form 1-NR/PY', agency: 'Massachusetts Department of Revenue', addrRefund: 'Massachusetts DOR, PO Box 7000, Boston, MA 02204', addrOwe: 'Massachusetts DOR, PO Box 7003, Boston, MA 02204', deadline: 'April 15, 2026' },
+  IL: { form: 'Form IL-1040 with Schedule NR', agency: 'Illinois Department of Revenue', addrRefund: 'Illinois Department of Revenue, Springfield, IL 62719-0001', addrOwe: 'Illinois Department of Revenue, Springfield, IL 62726-0001', deadline: 'April 15, 2026' }
+};
+
+/* ---------- state form fillers ---------- */
+function fieldsByName(form) { var m = {}; form.getFields().forEach(function (f) { m[f.getName()] = f; }); return m; }
+function setAny(map, candidates, val) {
+  if (val === undefined || val === null || String(val) === '') return;
+  for (var i = 0; i < candidates.length; i++) {
+    var f = map[candidates[i]];
+    if (f) { try { f.setText(String(val)); return; } catch (e) {} }
+  }
+}
+function moneyAny(map, candidates, val) { if (val) setAny(map, candidates, Math.round(val)); }
+function setMatch(form, fragments, val) {
+  if (val === undefined || val === null || String(val) === '') return;
+  var fields = form.getFields();
+  for (var i = 0; i < fields.length; i++) {
+    var n = fields[i].getName().toLowerCase(), ok = true;
+    for (var j = 0; j < fragments.length; j++) { if (n.indexOf(fragments[j].toLowerCase()) < 0) { ok = false; break; } }
+    if (ok) { try { fields[i].setText(String(val)); return; } catch (e) {} }
+  }
+}
+function moneyMatch(form, fragments, val) { if (val) setMatch(form, fragments, Math.round(val)); }
+function setMatchStart(form, prefix, val) {
+  if (val === undefined || val === null || String(val) === '') return;
+  var fields = form.getFields();
+  for (var i = 0; i < fields.length; i++) {
+    if (fields[i].getName().toLowerCase().indexOf(prefix.toLowerCase()) === 0) {
+      try { fields[i].setText(String(val)); return; } catch (e) {}
+    }
+  }
+}
+function moneyMatchStart(form, prefix, val) { if (val) setMatchStart(form, prefix, Math.round(val)); }
+function markWidget(doc, form, name, idx) {
+  try {
+    var f = form.getField(name);
+    var w = f.acroField.getWidgets()[idx || 0];
+    var rect = w.getRectangle();
+    var pref = w.P();
+    var pi = doc.getPages().findIndex(function (pg) { return pg.ref === pref; });
+    return { page: pi < 0 ? 0 : pi, x: rect.x, y: rect.y, w: rect.width, h: rect.height };
+  } catch (e) { return null; }
+}
+
+async function fillCA(PDFLib, bytes, d, s) {
+  var doc = await PDFLib.PDFDocument.load(bytes);
+  var form = doc.getForm(); var M = fieldsByName(form);
+  var P = '540NR_form_';
+  setAny(M, [P + '1003'], d.firstName); setAny(M, [P + '1005'], d.lastName);
+  setAny(M, [P + '1007'], (d.tin || '').replace(/\D/g, ''));
+  setAny(M, [P + '2001'], d.firstName + ' ' + d.lastName); setAny(M, [P + '2002'], (d.tin || '').replace(/\D/g, ''));
+  if (d.addrUS && d.addrUS.street) {
+    setAny(M, [P + '1015'], d.addrUS.street); setAny(M, [P + '1018'], d.addrUS.city);
+    setAny(M, [P + '1020'], d.addrUS.zip);
+  } else if (d.addrAbroad) {
+    setAny(M, [P + '1015'], d.addrAbroad.street); setAny(M, [P + '1018'], d.addrAbroad.city);
+    setAny(M, [P + '1021'], d.addrAbroad.country); setAny(M, [P + '1022'], d.addrAbroad.region); setAny(M, [P + '1023'], d.addrAbroad.postal);
+  }
+  var caMarks = [];
+  var caStatus = markWidget(doc, form, P + '1029 RB', d.status === 'mfs' ? 2 : 0);
+  if (caStatus) caMarks.push(caStatus);
+  moneyAny(M, [P + '1035'], s.l11);                 /* line 7 personal credit amount */
+  moneyAny(M, [P + '2003'], s.l11);                 /* line 11 total exemption credits */
+  moneyAny(M, [P + '2004'], s.l12);
+  moneyAny(M, [P + '2005'], s.l13);
+  moneyAny(M, [P + '2008'], s.l16);
+  moneyAny(M, [P + '2009'], s.l17);
+  moneyAny(M, [P + '2010'], s.l18);
+  moneyAny(M, [P + '2011'], s.l19);
+  moneyAny(M, [P + '2016'], s.l31);
+  moneyAny(M, [P + '2018'], s.l35);
+  moneyAny(M, [P + '2021'], s.l37);
+  moneyAny(M, [P + '2024'], s.l39);
+  moneyAny(M, [P + '2025'], s.l40);
+  moneyAny(M, [P + '2029'], s.tax);                 /* line 42 */
+  moneyAny(M, [P + '3009'], s.tax);                 /* line 62 total credits */
+  moneyAny(M, [P + '3010'], s.tax);                 /* line 63 */
+  moneyAny(M, [P + '3014'], s.tax);                 /* line 74 total tax */
+  moneyAny(M, [P + '3015'], s.payments);            /* line 81 withholding */
+  moneyAny(M, [P + '3022'], s.payments);            /* line 88 */
+  if (s.refund > 0) { moneyAny(M, [P + '3025'], s.payments); moneyAny(M, [P + '3027'], s.refund); moneyAny(M, [P + '3029'], s.refund); }
+  if (s.owed > 0) moneyAny(M, [P + '4003'], s.owed); /* line 104 */
+  form.flatten();
+  await drawMarks(PDFLib, doc, caMarks);
+  return doc;
+}
+async function fillNY(PDFLib, bytes, d, s) {
+  var doc = await PDFLib.PDFDocument.load(bytes);
+  var form = doc.getForm(); var M = fieldsByName(form);
+  setAny(M, ['Your first name'], d.firstName); setAny(M, ['Your last name'], d.lastName);
+  setAny(M, ['Your SSN', 'Your Social Security number'], (d.tin || '').replace(/\D/g, ''));
+  if (d.addrUS && d.addrUS.street) {
+    setAny(M, ['Mailing address'], d.addrUS.street); setAny(M, ['Apartment number'], d.addrUS.apt);
+    setAny(M, ['City, village or post office 1', 'City, village or post office'], d.addrUS.city);
+    setAny(M, ['State'], d.addrUS.state); setAny(M, ['ZIP code 1', 'ZIP code'], d.addrUS.zip);
+  }
+  moneyAny(M, ['federal 1 dollars'], s.fedWages); moneyAny(M, ['nys 1 dollars'], s.nysWages);
+  moneyAny(M, ['federal 16 dollars'], s.fedOther); moneyAny(M, ['nys 16 dollars'], s.nysOther);
+  moneyAny(M, ['federal 17 dollars'], s.fedTotal); moneyAny(M, ['nys 17 dollars'], s.nysAGI);
+  moneyAny(M, ['federal 19 dollars'], s.fedAGI); moneyAny(M, ['nys 19 dollars'], s.nysAGI);
+  moneyAny(M, ['federal 31 dollars'], s.fedAGI); moneyAny(M, ['nys 31 dollars'], s.nysAGI);
+  moneyAny(M, ['32 dollars'], s.fedAGI);
+  moneyAny(M, ['33 dollars'], s.sd);
+  moneyAny(M, ['34 dollars'], s.l34);
+  moneyAny(M, ['36 dollars'], s.l36);
+  moneyAny(M, ['37 dollars'], s.l36);
+  moneyAny(M, ['38 dollars'], s.tax38);
+  moneyAny(M, ['44 dollars'], s.tax38);
+  setAny(M, ['45nys dollars'], s.nysAGI); setAny(M, ['45 federal dollars'], s.fedAGI);
+  setAny(M, ['45 dollars'], s.pct.toFixed(4));
+  moneyAny(M, ['46 dollars'], s.tax);
+  moneyAny(M, ['48 dollars'], s.tax);
+  moneyAny(M, ['50 dollars'], s.tax);
+  setAny(M, ['56 dollars'], 0);
+  moneyAny(M, ['58 dollars'], s.tax);
+  moneyAny(M, ['59 dollars'], s.tax);
+  moneyAny(M, ['62 dollars'], s.payments);
+  moneyAny(M, ['66 dollars'], s.payments);
+  if (s.refund > 0) { moneyAny(M, ['67 dollars'], s.refund); moneyAny(M, ['68 dollars'], s.refund); }
+  if (s.owed > 0) moneyAny(M, ['70 dollars'], s.owed);
+  setAny(M, ['Occupation'], 'Student');
+  var nyMarks = [];
+  var stIdx = d.status === 'mfs' ? 2 : 0;
+  [markWidget(doc, form, 'Filing Status', stIdx),
+   markWidget(doc, form, 'deduction', 0),
+   markWidget(doc, form, 'BoxB', 1),
+   markWidget(doc, form, 'BoxC', 1),
+   markWidget(doc, form, 'BoxD1', d.nyForeignAcct === 'yes' ? 0 : 1)
+  ].forEach(function (m) { if (m) nyMarks.push(m); });
+  form.flatten();
+  await drawMarks(PDFLib, doc, nyMarks);
+  return doc;
+}
+async function fillMA(PDFLib, bytes, d, s) {
+  var doc = await PDFLib.PDFDocument.load(bytes);
+  var form = doc.getForm(); var M = fieldsByName(form);
+  var FIRST = 'taxpayer\u2019s first name', LAST = 'taxpayer\u2019s last name', SSN = 'taxpayer\u2019s social security number';
+  setAny(M, [FIRST], d.firstName); setAny(M, [LAST], d.lastName);
+  setAny(M, [SSN], (d.tin || '').replace(/\D/g, ''));
+  if (d.addrUS && d.addrUS.street) {
+    setAny(M, ['mailing address'], d.addrUS.street + (d.addrUS.apt ? ', ' + d.addrUS.apt : ''));
+    setAny(M, ['city/town'], d.addrUS.city); setAny(M, ['state'], d.addrUS.state); setAny(M, ['zip code'], d.addrUS.zip);
+  }
+  var L5 = ['line 5. Wages, salaries, tips and other employee compensation (from all Forms W-2)', 'line 5'];
+  moneyAny(M, L5, s.maIncome);
+  moneyAny(M, ['line 12.TOTAL 5.0% INCOME. Add lines 5 through 11. Be sure to subtract any losses in lines 8 or 9', 'line 12'], s.maIncome);
+  moneyMatch(form, ['line 14a', 'Total 5.0% income (from line 12)'], s.maIncome);
+  moneyMatch(form, ['line 14d', 'Total income this return'], s.maIncome);
+  moneyMatch(form, ['line 14e', 'Non-Massachusetts source income'], s.totalIncome - s.maIncome);
+  moneyMatch(form, ['line 14f', 'Total income'], s.totalIncome);
+  setMatch(form, ['line 14g', 'Deduction and exemption ratio'], s.ratio >= 1 ? '1' : s.ratio.toFixed(4));
+  moneyMatch(form, ['line 22a', 'Total exemption amount'], 4400);
+  moneyAny(M, ['Line 4a. Personal exemptions. Single/Married filing separately ($4,400), Head of household ($6,800), Married filing jointly ($8,800)', 'Line 4a'], 4400);
+  moneyAny(M, ['line 4g. Total exemptions. Add lines 2a through 2f. Enter here and on line 18', 'line 4g'], 4400);
+  moneyAny(M, ['line 15a. Amount you paid to Social Security, Medicare, Railroad, U.S. or Massachusetts retirement', 'line 15a'], s.ficaDed);
+  moneyAny(M, ['Line 20. Total Deductions. Add Lines 15 Through 19', 'Line 20'], s.ficaDed);
+  moneyAny(M, ['Line 21. 5.0% Income After Deductions. Subtract Line 20 From Line 12. Not Less Than 0', 'Line 21'], s.afterDed);
+  moneyAny(M, ['line 22. Part-year residents: Multiply line 22a by line 3. Nonresidents: Multiply line 22a by line 14g', 'line 22'], s.exemption);
+  moneyMatch(form, ['line 23', 'Income After Exemptions'], s.taxable);
+  moneyAny(M, ['line 25. Total Taxable 5.0% Income. Add Lines 23 And 24', 'line 25'], s.taxable);
+  moneyMatch(form, ['line 26', 'tax on 5.0% income'], s.tax);
+  moneyAny(M, ['line 32. Total tax. Subtract line 32c from the total of lines 32a and 32b', 'line 32'], s.tax);
+  moneyAny(M, ['line 36. Income tax after credits. subtract total of lines 33 through 35 from line 32. not less than 0', 'line 36'], s.tax);
+  moneyAny(M, ['line 41. income tax after credits, contributions, use tax and hc penalty. add lines 36 through 40', 'line 41'], s.tax);
+  moneyAny(M, ['Line 42a. Massachusetts income tax withheld from Form(s) W-2'], s.payments);
+  moneyMatch(form, ['Add lines 42a through 42c'], s.payments);
+  moneyAny(M, ['line 55. total. Add lines 42 through 46 and lines 52 through 54', 'line 55'], s.payments);
+  if (s.refund > 0) { moneyMatchStart(form, 'line 56.', s.refund); moneyMatch(form, ['line 58', 'Your Refund'], s.refund); }
+  if (s.owed > 0) moneyMatch(form, ['amount due'], s.owed);
+  form.flatten();
+  return doc;
+}
+async function fillIL(PDFLib, bytes, d, s, fed) {
+  var doc = await PDFLib.PDFDocument.load(bytes);
+  var form = doc.getForm(); var M = fieldsByName(form);
+  setAny(M, ['step1-A-firstnamemi'], (d.firstName + ' ' + (d.middleInitial || '')).trim());
+  setAny(M, ['step1-A-lastname'], d.lastName);
+  setAny(M, ['step1-A-ssn'], (d.tin || '').replace(/\D/g, ''));
+  if (d.addrUS && d.addrUS.street) {
+    setAny(M, ['step1-A-mailingaddress'], d.addrUS.street); setAny(M, ['step1-A-aptno'], d.addrUS.apt);
+    setAny(M, ['step1-A-city'], d.addrUS.city); setAny(M, ['step1-A-state'], d.addrUS.state); setAny(M, ['step1-A-zip'], d.addrUS.zip);
+  } else if (d.addrAbroad) {
+    setAny(M, ['step1-A-mailingaddress'], d.addrAbroad.street); setAny(M, ['step1-A-city'], d.addrAbroad.city);
+    setAny(M, ['step1-A-foreignnation'], d.addrAbroad.country); setAny(M, ['step1-A-zip'], d.addrAbroad.postal);
+  }
+  moneyAny(M, ['Federally adjusted income'], fed.line11a);
+  moneyAny(M, ['Total income'], fed.line11a);
+  moneyAny(M, ['Illinois base income'], fed.line11a);
+  moneyAny(M, ['Illinois net income from Schedule NR'], s.net);
+  moneyAny(M, ['Multiply residency rate'], s.tax);
+  moneyAny(M, ['Income tax'], s.tax);
+  moneyAny(M, ['Tax after nonrefundable credits'], s.tax);
+  moneyAny(M, ['Total Tax'], s.tax);
+  moneyAny(M, ['Total tax from Page 1'], s.tax);
+  moneyAny(M, ['Illinois Income Tax withheld'], s.payments);
+  moneyAny(M, ['Total payments and refundable credit'], s.payments);
+  if (s.refund > 0) {
+    moneyAny(M, ['If Line 31 is greater'], s.refund);
+    moneyAny(M, ['Overpayment amount'], s.refund);
+    moneyAny(M, ['Refunded to you'], s.refund);
+  }
+  if (s.owed > 0) {
+    moneyAny(M, ['If Line 24 is greater'], s.owed);
+    moneyAny(M, ['Amount you owe'], s.owed);
+  }
+  var ilMarks = [];
+  [markWidget(doc, form, 'filing_status', d.status === 'mfs' ? 2 : 0),
+   markWidget(doc, form, 'residency', 0)
+  ].forEach(function (m) { if (m) ilMarks.push(m); });
+  form.flatten();
+  await drawMarks(PDFLib, doc, ilMarks);
   return doc;
 }
