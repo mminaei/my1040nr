@@ -44,6 +44,26 @@ function setText(form, name, value) {
   if (value === undefined || value === null || value === '') return;
   try { form.getTextField(name).setText(String(value)); } catch (e) { /* field absent */ }
 }
+/* pdf-lib check() does not render visibly on these IRS XFA-derived forms,
+   so checked boxes are drawn as an X mark at the widget rectangle instead. */
+function boxMark(doc, form, name) {
+  try {
+    var w = form.getCheckBox(name).acroField.getWidgets()[0];
+    var rect = w.getRectangle();
+    var pref = w.P();
+    var idx = doc.getPages().findIndex(function (p) { return p.ref === pref; });
+    return { page: idx < 0 ? 0 : idx, x: rect.x, y: rect.y, w: rect.width, h: rect.height };
+  } catch (e) { return null; }
+}
+async function drawMarks(PDFLib, doc, marks) {
+  if (!marks.length) return;
+  var font = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+  marks.forEach(function (m) {
+    if (!m) return;
+    doc.getPage(m.page).drawText('X', { x: m.x + m.w / 2 - 3.6, y: m.y + m.h / 2 - 4.2, size: 11, font: font });
+  });
+}
+
 async function fill8843(PDFLib, formBytes, d) {
   const doc = await PDFLib.PDFDocument.load(formBytes);
   const form = doc.getForm();
@@ -72,15 +92,17 @@ async function fill8843(PDFLib, formBytes, d) {
     const v = d['visa' + y];
     if (v && v !== 'none') setText(form, FIELD['visa' + y], v);
   });
+  const marks = [];
   try {
-    if (d.line12 === 'yes') form.getCheckBox(CHECK.line12yes).check();
-    else form.getCheckBox(CHECK.line12no).check();
+    if (d.line12 === 'yes') marks.push(boxMark(doc, form, CHECK.line12yes));
+    else marks.push(boxMark(doc, form, CHECK.line12no));
     if (d.line13 === 'yes') {
-      form.getCheckBox(CHECK.line13yes).check();
+      marks.push(boxMark(doc, form, CHECK.line13yes));
       setText(form, FIELD.line14, d.line14);
-    } else form.getCheckBox(CHECK.line13no).check();
+    } else marks.push(boxMark(doc, form, CHECK.line13no));
   } catch (e) { /* checkbox naming differs */ }
   form.flatten();
+  await drawMarks(PDFLib, doc, marks);
   return doc;
 }
 function wrapText(text, max) {
@@ -162,4 +184,177 @@ async function buildPackage(PDFLib, formBytes, d) {
 }
 if (typeof module !== 'undefined') {
   module.exports = { buildPackage, fill8843, studentYearCount, RULES_VERSION, FIELD, CHECK };
+}
+
+/* ================= Form 1040-NR pipeline (tax year 2025) =================
+   Scope v1: nonresident alien students with effectively connected income from
+   Form W-2 and/or Form 1042-S (wages and taxable scholarship/fellowship),
+   single or married filing separately, no dependents, no NEC income.
+   Treaty table v1: TODO_VERIFY against the IRS tax treaty tables and each
+   treaty text before public reliance. Sources: IRS Tax Treaties page,
+   Publication 901, Form 1040-NR instructions (2025), Rev. Proc. 2024-40 as
+   amended for 2025 (standard deduction $15,750 single). */
+
+var NR_RULES_VERSION = '2025.1.0';
+var STD_DED_2025 = 15750;
+/* 2025 federal brackets, single and MFS (top of each bracket, rate). */
+var BRACKETS_2025 = {
+  single: [[11925, .10], [48475, .12], [103350, .22], [197300, .24], [250525, .32], [626350, .35], [Infinity, .37]],
+  mfs:    [[11925, .10], [48475, .12], [103350, .22], [197300, .24], [250525, .32], [313175, .35], [Infinity, .37]]
+};
+var TREATY_STUDENT_2025 = {
+  /* China, Article 20(c): up to $5,000 of employment income exempt. */
+  'China': { exemptWages: 5000, article: '20(c)' },
+  /* India, Article 21(2): students may claim the standard deduction (line 12). */
+  'India': { standardDeduction: true, article: '21(2)' }
+};
+
+function bracketTax(income, status) {
+  var b = BRACKETS_2025[status] || BRACKETS_2025.single, prev = 0, tax = 0;
+  for (var i = 0; i < b.length; i++) {
+    if (income > prev) { tax += (Math.min(income, b[i][0]) - prev) * b[i][1]; prev = b[i][0]; }
+  }
+  return tax;
+}
+/* IRS Tax Table for income under $100,000 (midpoint of the $50 range,
+   $25 ranges below $3,000), otherwise the Tax Computation Worksheet. */
+function taxTable2025(income, status) {
+  if (income <= 0) return 0;
+  if (income >= 100000) return Math.round(bracketTax(income, status));
+  var step = income < 3000 ? 25 : 50;
+  var mid = Math.floor(income / step) * step + step / 2;
+  return Math.round(bracketTax(mid, status));
+}
+
+/* Residency for 2025. Inputs: visaNow (e.g. 'F-1'), days {2023,2024,2025},
+   fjYearsThrough2025 = number of calendar years (including 2025) in which
+   the person held F or J status for any part of the year, greenCard bool. */
+function residency2025(d) {
+  if (d.greenCard) return { resident: true, why: 'Green card test: resident alien.' };
+  var isFJ = /^(F|J|M|Q)-?/.test(d.visaNow || '');
+  function exemptYear(yearsThrough) { return isFJ && yearsThrough <= 5; }
+  var y25 = d.fjYearsThrough2025 || 0;
+  var ex25 = exemptYear(y25), ex24 = exemptYear(y25 - 1), ex23 = exemptYear(y25 - 2);
+  var weighted = (ex25 ? 0 : (d.days[2025] || 0))
+    + (ex24 ? 0 : (d.days[2024] || 0)) / 3
+    + (ex23 ? 0 : (d.days[2023] || 0)) / 6;
+  var spt = (d.days[2025] || 0) >= 31 && weighted >= 183;
+  if (ex25) return { resident: false, exempt: true, weighted: weighted, why: 'Exempt individual for 2025 (F/J within the 5 calendar year limit): days do not count, nonresident alien.' };
+  if (spt) return { resident: true, weighted: weighted, why: 'Substantial presence test met (' + Math.round(weighted) + ' weighted days): resident alien for 2025.' };
+  return { resident: false, exempt: false, weighted: weighted, why: 'Substantial presence test not met (' + Math.round(weighted) + ' weighted days): nonresident alien.' };
+}
+
+function computeNR(d) {
+  var treaty = TREATY_STUDENT_2025[d.treatyCountry] || null;
+  var grossWages = num(d.wagesW2) + num(d.wages1042);
+  var exemptAmt = 0;
+  if (treaty && treaty.exemptWages) exemptAmt = Math.min(treaty.exemptWages, grossWages);
+  var line1a = grossWages, line1k = exemptAmt, line1z = line1a - line1k;
+  var line8 = num(d.scholarshipTaxable);
+  var line9 = line1z + line8;
+  var line12 = (treaty && treaty.standardDeduction) ? STD_DED_2025 : 0;
+  var taxable = Math.max(0, line9 - line12);
+  var tax = taxTable2025(taxable, d.status === 'mfs' ? 'mfs' : 'single');
+  var payments = num(d.fedWithheldW2) + num(d.withheld1042);
+  var ficaWithheld = num(d.ssTaxW2) + num(d.medTaxW2);
+  return {
+    line1a: line1a, line1k: line1k, line1z: line1z, line8: line8, line9: line9,
+    line11a: line9, line12: line12, line14: line12, line15: taxable, line16: tax,
+    line24: tax, line25a: num(d.fedWithheldW2), line25g: num(d.withheld1042),
+    line33: payments, refund: payments > tax ? payments - tax : 0,
+    owed: tax > payments ? tax - payments : 0,
+    exemptAmt: exemptAmt, treatyArticle: treaty ? treaty.article : null,
+    ficaWithheld: ficaWithheld,
+    ficaFlag: ficaWithheld > 0 && /^(F|J)-?/.test(d.visaNow || '')
+  };
+}
+function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+var NR = 'topmostSubform[0].Page1[0].', NR2 = 'topmostSubform[0].Page2[0].',
+    OI = 'form1040-NR[0].Page1[0].', S1 = 'topmostSubform[0].Page1[0].';
+async function fill1040NR(PDFLib, formBytes, d, c) {
+  var doc = await PDFLib.PDFDocument.load(formBytes);
+  var form = doc.getForm();
+  var T = function (n, v) { if (v !== undefined && v !== null && String(v) !== '') { try { form.getTextField(n).setText(String(v)); } catch (e) {} } };
+  var M = function (n, v) { if (v) T(n, Math.round(v)); };
+  var marksNR = [];
+  var K = function (n) { var m = boxMark(doc, form, n); if (m) marksNR.push(m); };
+  T(NR + 'f1_14[0]', (d.firstName + ' ' + (d.middleInitial || '')).trim());
+  T(NR + 'f1_15[0]', d.lastName);
+  T(NR + 'f1_16[0]', (d.tin || '').replace(/\D/g, ''));
+  if (d.addrUS) {
+    T(NR + 'f1_17[0]', d.addrUS.street); T(NR + 'f1_18[0]', d.addrUS.apt);
+    T(NR + 'f1_19[0]', d.addrUS.city); T(NR + 'f1_20[0]', d.addrUS.state); T(NR + 'f1_21[0]', d.addrUS.zip);
+  } else if (d.addrAbroad) {
+    T(NR + 'f1_17[0]', d.addrAbroad.street); T(NR + 'f1_19[0]', d.addrAbroad.city);
+    T(NR + 'f1_22[0]', d.addrAbroad.country); T(NR + 'f1_23[0]', d.addrAbroad.region); T(NR + 'f1_24[0]', d.addrAbroad.postal);
+  }
+  if (d.status === 'mfs') K(NR + 'c1_5[1]'); else K(NR + 'c1_5[0]');
+  if (d.digitalAssets === 'yes') K(NR + 'c1_6[0]'); else K(NR + 'c1_6[1]');
+  M(NR + 'f1_42[0]', c.line1a); M(NR + 'Line1k_ReadOrder[0].f1_53[0]', c.line1k); M(NR + 'f1_54[0]', c.line1z);
+  M(NR + 'f1_68[0]', c.line8); M(NR + 'f1_69[0]', c.line9); M(NR + 'f1_71[0]', c.line11a);
+  M(NR2 + 'f2_01[0]', c.line11a); M(NR2 + 'f2_02[0]', c.line12); M(NR2 + 'f2_06[0]', c.line14);
+  M(NR2 + 'f2_07[0]', c.line15); M(NR2 + 'f2_09[0]', c.line16); M(NR2 + 'f2_11[0]', c.line16);
+  M(NR2 + 'f2_15[0]', c.line24); M(NR2 + 'f2_20[0]', c.line24);
+  M(NR2 + 'f2_21[0]', c.line25a); M(NR2 + 'f2_27[0]', c.line25g);
+  if (c.line25a || c.line25g) M(NR2 + 'f2_24[0]', c.line33);
+  M(NR2 + 'f2_35[0]', c.line33);
+  if (c.refund > 0) { M(NR2 + 'f2_36[0]', c.refund); M(NR2 + 'f2_37[0]', c.refund); }
+  if (c.owed > 0) M(NR2 + 'f2_42[0]', c.owed);
+  T(NR2 + 'f2_47[0]', 'Student');
+  form.flatten();
+  await drawMarks(PDFLib, doc, marksNR);
+  return doc;
+}
+async function fillScheduleOI(PDFLib, oiBytes, d, c) {
+  var doc = await PDFLib.PDFDocument.load(oiBytes);
+  var form = doc.getForm();
+  var T = function (n, v) { if (v) { try { form.getTextField(n).setText(String(v)); } catch (e) {} } };
+  var marksOI = [];
+  var K = function (n) { var m = boxMark(doc, form, n); if (m) marksOI.push(m); };
+  var YN = function (base, yes) { K(OI + base + (yes ? '[0]' : '[1]')); };
+  T(OI + 'f1_1[0]', d.firstName + ' ' + d.lastName);
+  T(OI + 'f1_2[0]', (d.tin || '').replace(/\D/g, ''));
+  T(OI + 'f1_3[0]', d.citizenship); T(OI + 'f1_4[0]', d.taxResidence || d.citizenship);
+  YN('c1_1', d.appliedGreenCard === 'yes');
+  YN('c1_2', false); YN('c1_3', d.everGreenCard === 'yes');
+  T(OI + 'f1_5[0]', d.visaNow);
+  YN('c1_4', d.changedStatus === 'yes'); if (d.changedStatus === 'yes') T(OI + 'f1_6[0]', d.changeDetail);
+  var tripPaths = [];
+  [1, 2, 3, 4].forEach(function (r) {
+    tripPaths.push(OI + 'LineG_Table1[0].BodyRow' + r + '[0].f1_' + (5 + r * 2) + '[0]');
+    tripPaths.push(OI + 'LineG_Table1[0].BodyRow' + r + '[0].f1_' + (6 + r * 2) + '[0]');
+    tripPaths.push(OI + 'LineG_Table2[0].BodyRow' + r + '[0].f1_' + (13 + r * 2) + '[0]');
+    tripPaths.push(OI + 'LineG_Table2[0].BodyRow' + r + '[0].f1_' + (14 + r * 2) + '[0]');
+  });
+  var yy = function (s) { var m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); return m ? m[1].padStart(2, '0') + '/' + m[2].padStart(2, '0') + '/' + m[3].slice(-2) : s; };
+  (d.trips || []).slice(0, 8).forEach(function (t, i) {
+    T(tripPaths[i * 2], yy(t.enter)); T(tripPaths[i * 2 + 1], yy(t.exit));
+  });
+  T(OI + 'f1_23[0]', d.days[2023]); T(OI + 'f1_24[0]', d.days[2024]); T(OI + 'f1_25[0]', d.days[2025]);
+  YN('c1_6', d.filedBefore === 'yes'); if (d.filedBefore === 'yes') T(OI + 'f1_26[0]', d.priorFiling);
+  YN('c1_7', false); /* J: not a trust */
+  YN('c1_8', false); /* K: compensation under $250,000 in this pipeline's scope */
+  if (c.exemptAmt > 0) {
+    var LT = OI + 'LineL1_Table[0].BodyRow1[0].';
+    T(LT + 'f1_27[0]', d.treatyCountry); T(LT + 'f1_28[0]', c.treatyArticle);
+    T(LT + 'f1_29[0]', d.treatyMonthsPrior || '0'); T(LT + 'f1_30[0]', Math.round(c.exemptAmt));
+    T(OI + 'f1_39[0]', Math.round(c.exemptAmt));
+    YN('c1_11', d.treatyForeignTaxed === 'yes'); YN('c1_12', false);
+  }
+  form.flatten();
+  await drawMarks(PDFLib, doc, marksOI);
+  return doc;
+}
+async function fillSchedule1(PDFLib, s1Bytes, d, c) {
+  var doc = await PDFLib.PDFDocument.load(s1Bytes);
+  var form = doc.getForm();
+  var T = function (n, v) { if (v) { try { form.getTextField(n).setText(String(v)); } catch (e) {} } };
+  T(S1 + 'f1_01[0]', d.firstName + ' ' + d.lastName);
+  T(S1 + 'f1_02[0]', (d.tin || '').replace(/\D/g, ''));
+  T(S1 + 'f1_30[0]', Math.round(c.line8)); /* line 8r scholarship */
+  T(S1 + 'f1_37[0]', Math.round(c.line8)); /* line 9 */
+  T(S1 + 'f1_38[0]', Math.round(c.line8)); /* line 10 */
+  form.flatten();
+  return doc;
 }
