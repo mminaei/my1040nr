@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Do I need to file a state tax return? | My1040NR</title>
+<meta name="description" content="International students: your federal return is not the whole story. Check state by state whether you must file a state tax return, in plain English, with the no income tax states listed.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">My<span>1040NR</span></div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="residency.html">Residency checker</a>
+      <a href="exempt.html">What is "exempt"?</a>
+      <a href="forms.html">Forms guide</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </header>
+
+  <section>
+    <h1 style="font-size:36px">Do I need to file a state tax return?</h1>
+    <p class="body" style="margin-top:12px">Federal is only half the question. States have their own tax, their own forms, and their own deadline, and here is the part that surprises students: <strong>your state answer can be different from your federal answer.</strong> Being a nonresident for federal tax does not automatically make you a nonresident for a state. Each state decides with its own test.</p>
+    <p class="body" style="margin-top:10px">Run this check once for every state you lived in or earned money in during the year. If you moved states mid-year (very common after graduation, or for a summer internship in another state), you may owe a part-year return in two states.</p>
+
+    <label for="state">State you lived in or earned money in</label>
+    <select id="state">
+      <option value="CA">California</option>
+      <option value="NY">New York</option>
+      <option value="MA">Massachusetts</option>
+      <option value="IL">Illinois</option>
+      <option value="TX">Texas</option>
+      <option value="NOTAX">Another no income tax state (AK, FL, NV, NH, SD, TN, WA, WY)</option>
+      <option value="OTHER">Another state with an income tax</option>
+    </select>
+
+    <label for="earned">Did you earn income in that state (a job, assistantship, internship, or OPT employer located there)?</label>
+    <select id="earned"><option value="no">No</option><option value="yes">Yes</option></select>
+
+    <label for="amount">About how much did you earn in that state, in dollars?</label>
+    <input id="amount" type="number" min="0" value="0">
+
+    <label for="withheld">Did that state take tax out of your pay? Look at your W-2, boxes 16 and 17, or your pay stubs.</label>
+    <select id="withheld"><option value="no">No, or I do not have a W-2</option><option value="yes">Yes, state tax was withheld</option></select>
+
+    <label for="lived">How did you live in that state?</label>
+    <select id="lived">
+      <option value="all">I lived there most of the year</option>
+      <option value="part">Part of the year, I moved in or out</option>
+      <option value="dorm">I only lived there in a dorm or student housing for school</option>
+      <option value="none">I did not live there, I only earned money there</option>
+    </select>
+
+    <p style="margin-top:20px"><button class="btn" onclick="runState()">Check this state</button></p>
+    <div class="result" id="result"></div>
+    <p class="small" style="margin-top:14px">Simplified checker for guidance only, using reference filing thresholds for tax year 2025. State rules and thresholds change, and a few cases (keeping a year-round apartment in New York, California's worldwide income threshold tables) need the full interview. The full My1040NR service runs this same logic state by state, prepares the state forms into the same PDF, and adds a separate state mailing slip, because the state return goes in its own envelope to the state, never to the IRS.</p>
+  </section>
+
+  <section>
+    <h2>The short version, state by state</h2>
+    <table>
+      <tr><th>State</th><th>When a student files</th></tr>
+      <tr><td>Texas and the no income tax states</td><td>Never for income tax. These states have no individual income tax: AK, FL, NV, NH, SD, TN, TX, WA, WY.</td></tr>
+      <tr><td>Massachusetts</td><td>Nonresidents file Form 1-NR/PY if Massachusetts income is over $8,000. Below that, file anyway if tax was withheld and you want it back.</td></tr>
+      <tr><td>New York</td><td>Nonresidents file Form IT-203 if New York income is over the standard deduction for your status ($8,000 if single), or to get withheld tax back. Keeping a year-round apartment plus more than 183 days in New York can make you a resident for state tax even as a federal nonresident.</td></tr>
+      <tr><td>Illinois</td><td>File Form IL-1040 if your Illinois income is over the exemption allowance ($2,850 per person for 2025), or to recover withholding.</td></tr>
+      <tr><td>California</td><td>Nonresidents and part-year residents file Form 540NR when income passes the FTB threshold tables, which look at your worldwide income, not just California income. California also does not follow most federal tax treaties, so treaty-free federal income can still be taxed by California.</td></tr>
+      <tr><td>Any state</td><td>If the state withheld tax from your pay, filing is how you settle it, and often how you get money back. If you earned nothing in a state and only lived there as a student, you normally file nothing with that state. Form 8843 is federal only, states have no version of it.</td></tr>
+    </table>
+  </section>
+
+    <p class="small" style="margin-top:26px"><a href="legal.html">Disclaimer, terms and privacy</a> | Not tax advice. Not affiliated with the IRS.</p>
+  <footer>My1040NR. Federal and state, answered separately.</footer>
+</div>
+<script>
+var THRESH={CA:null,NY:8000,MA:8000,IL:2850};
+var NAMES={CA:'California',NY:'New York',MA:'Massachusetts',IL:'Illinois'};
+function runState(){
+  var st=document.getElementById('state').value;
+  var earned=document.getElementById('earned').value==='yes';
+  var amt=parseInt(document.getElementById('amount').value||'0',10);
+  var wh=document.getElementById('withheld').value==='yes';
+  var lived=document.getElementById('lived').value;
+  var out=document.getElementById('result'); out.style.display='block';
+  var h='';
+  if(st==='TX'||st==='NOTAX'){ h='<h3>No state return</h3><p>That state has no individual income tax, so there is no state return to file for your wages. Your federal return (and Form 8843) is still required as usual.</p>'; }
+  else if(!earned && !wh){ h='<h3>Likely no state return for this state</h3><p>You earned nothing there and no state tax was taken from your pay, so there is normally nothing to file with that state. Form 8843 is federal only. If you earned in another state, run this check for that state too.</p>'; }
+  else if(wh && (!earned || amt < (THRESH[st]||0))){ h='<h3>File this state return</h3><p>State tax was taken out of your pay. Even if your income is under the filing threshold, filing the state return is the only way to settle that withholding and get back anything you are owed. This is the most common reason students below the threshold still file.</p>'; }
+  else if(THRESH[st] && amt>THRESH[st]){ h='<h3>File this state return</h3><p>Your income in '+NAMES[st]+' (about $'+amt.toLocaleString()+') is over the reference filing threshold of $'+THRESH[st].toLocaleString()+' for a nonresident or part-year filer, so a state return is required. '+(lived==='part'?'Because you lived there part of the year, expect a part-year return.':'')+'</p>'; }
+  else if(st==='CA' && earned){ h='<h3>Likely file, California needs the full test</h3><p>California compares your worldwide income (from everywhere, not just California) with its threshold tables, and it does not follow most federal tax treaties. Most students who worked in California do end up filing Form 540NR. The full My1040NR interview runs the exact table for your numbers.</p>'; }
+  else if(st==='OTHER' && earned){ h='<h3>Likely file, check the full interview</h3><p>You earned income in a state with an income tax. Whether you must file depends on that state\'s threshold and its own residency test. The full My1040NR service runs every state you lived or earned in, one by one.</p>'; }
+  else { h='<h3>Likely no state return, on these numbers</h3><p>Your income in this state looks under its filing threshold and no state tax was withheld. Keep your W-2 anyway: if a state tax line (boxes 16 and 17) turns out to have an amount in it, the answer changes to file.</p>'; }
+  if(st==='NY' && lived==='all'){ h+='<p><strong>New York warning:</strong> if you kept a year-round apartment in New York and spent more than 183 days in the state, New York may treat you as a resident for state tax even though you are a nonresident federally. The full interview asks this directly.</p>'; }
+  out.innerHTML=h;
+}
+</script>
+</body>
+</html>

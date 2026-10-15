@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Residency checker: am I a resident for US tax purposes? | My1040NR</title>
+<meta name="description" content="Free residency checker for international students. We never ask if you were exempt. Tell us your visa and your first year in the US, we count your years and days, and tell you whether you file Form 1040 or Form 1040-NR.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">My<span>1040NR</span></div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="exempt.html">What is "exempt"?</a>
+      <a href="forms.html">Forms guide</a>
+      <a href="states.html">State tax?</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </header>
+
+  <section>
+    <h1 style="font-size:36px">Am I a resident for tax purposes?</h1>
+    <p class="body" style="margin-top:12px">We will not ask you if you were "exempt", because almost nobody knows. Instead, tell us your visa and when you first came. We count your years for you, work out which of your days count, and show you the answer with the numbers. New to the word exempt? Read <a href="exempt.html">the plain English explanation</a> first, it takes two minutes.</p>
+
+    <label for="citizen">Are you a US citizen or a green card holder?</label>
+    <select id="citizen"><option value="no">No</option><option value="yes">Yes</option></select>
+
+    <label for="visa">Your visa type</label>
+    <select id="visa">
+      <option value="F-student">F-1 student (or F-2 family)</option>
+      <option value="J-student">J-1 student (or J-2 family)</option>
+      <option value="J-scholar">J-1 teacher, researcher or trainee</option>
+      <option value="other">Other visa, or no visa</option>
+    </select>
+
+    <label for="firstYear">What was the first calendar year you were in the US on an F or J visa, even for one day?</label>
+    <p class="small">Look at your first I-20 or DS-2019 start date, or your oldest US entry stamp. Example: you arrived in August 2023, so your first year is 2023.</p>
+    <input id="firstYear" type="number" min="1990" max="2025" value="2023">
+
+    <label for="priorYears">Before that first year, how many earlier calendar years had you already spent in the US on any F or J visa?</label>
+    <p class="small">Most students: 0. Count these only if you had an earlier US stay on F or J, for example a bachelor's before a master's, in years before the first year above.</p>
+    <input id="priorYears" type="number" min="0" max="20" value="0">
+
+    <label for="d2025">Days physically in the US in 2025</label>
+    <input id="d2025" type="number" min="0" max="366" value="200">
+    <label for="d2024">Days physically in the US in 2024</label>
+    <input id="d2024" type="number" min="0" max="366" value="200">
+    <label for="d2023">Days physically in the US in 2023</label>
+    <input id="d2023" type="number" min="0" max="366" value="100">
+    <p class="small">Not sure of your days? Your I-94 travel history at i94.cbp.dhs.gov lists every entry and exit.</p>
+
+    <p style="margin-top:20px"><button class="btn" onclick="runCheck()">Count my years and check</button></p>
+
+    <div class="result" id="result"></div>
+    <p class="small" style="margin-top:14px">Simplified checker for guidance only. It does not handle days you could not leave because of a medical condition, the closer connection exception (Form 8840), dual-status years, or treaty tie-breakers. The full My1040NR interview handles all of those.</p>
+  </section>
+
+    <p class="small" style="margin-top:26px"><a href="legal.html">Disclaimer, terms and privacy</a> | Not tax advice. Not affiliated with the IRS.</p>
+  <footer>My1040NR. Residency first, then the right form.</footer>
+</div>
+<script>
+function yearCounts(year, firstYear, priorYears, limit, isVisa){
+  // Years that "do not count" (the IRS word is exempt), counted year by year.
+  // Position of a given year in the student's sequence of F or J calendar years:
+  if(!isVisa) return false;
+  var position = priorYears + (year - firstYear + 1);
+  if(position < 1) return true; // before the first recorded year: treat as not counting, days are normally 0 anyway
+  return position <= limit;
+}
+function runCheck(){
+  var citizen=document.getElementById('citizen').value;
+  var visa=document.getElementById('visa').value;
+  var firstYear=parseInt(document.getElementById('firstYear').value||'2025',10);
+  var priorYears=parseInt(document.getElementById('priorYears').value||'0',10);
+  var days={2025:parseInt(document.getElementById('d2025').value||'0',10),2024:parseInt(document.getElementById('d2024').value||'0',10),2023:parseInt(document.getElementById('d2023').value||'0',10)};
+  var out=document.getElementById('result'); out.style.display='block';
+  if(citizen==='yes'){ out.innerHTML='<h3>Resident for tax purposes</h3><p>US citizens and green card holders file Form 1040 as residents. My1040NR is built for nonresident students, so resident software can serve you. We would rather tell you that than sell you the wrong product. Everything here is free, by the way, there is nothing to sell.</p>'; return; }
+  var limit=(visa==='J-scholar')?2:5;
+  var isVisa=(visa!=='other');
+  var seqYear = priorYears + (2025 - firstYear + 1);
+  var c={};
+  [2025,2024,2023].forEach(function(y){ c[y]= yearCounts(y, firstYear, priorYears, limit, isVisa) ? 0 : days[y]; });
+  var total=c[2025] + c[2024]/3 + c[2023]/6;
+  var spt=(total>=183 && c[2025]>=31);
+  var html='<h3>Step 1: your years that do not count</h3>';
+  if(isVisa){
+    html+='<p>Counting from your first year ('+firstYear+')'+(priorYears>0?', plus '+priorYears+' earlier F or J year(s),':'')+' 2025 is year <strong>'+seqYear+'</strong> of your F or J years. Your limit is <strong>'+limit+' years</strong> for your visa type.</p>';
+    html+='<p>'+(seqYear<=limit ? 'You are still inside your limit, so <strong>your days in 2025 do not count</strong> toward the residency day test. The IRS calls this being an "exempt individual". It does not mean you pay no tax, and you still file.' : 'You are past your limit, so <strong>your days now count</strong> toward the residency day test.')+'</p>';
+  } else {
+    html+='<p>You are not on an F or J visa, so every day in the US counts toward the day test.</p>';
+  }
+  html+='<h3 style="margin-top:14px">Step 2: your day test</h3><p>Days that count: 2025: '+c[2025]+', plus one third of 2024: '+(c[2024]/3).toFixed(1)+', plus one sixth of 2023: '+(c[2023]/6).toFixed(1)+'. Total: <strong>'+total.toFixed(1)+'</strong>. The test needs 183 or more, and at least 31 counted days in 2025.</p>';
+  if(spt){ html+='<p><strong>Likely resident for tax purposes for 2025.</strong> You file Form 1040 like a US citizen, and Social Security and Medicare tax now applies to your wages. If you were in the US fewer than 183 days in 2025 itself, also check the closer connection exception (Form 8840) in the full interview.</p>'; }
+  else { html+='<p><strong>Likely nonresident for tax purposes for 2025.</strong> File Form 1040-NR if you had US income, and Form 8843 if you held an F, J, M or Q visa, even with no income.</p>'; }
+  out.innerHTML=html;
+}
+</script>
+</body>
+</html>
