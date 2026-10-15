@@ -1,0 +1,72 @@
+name: deploy-production
+
+# Production updates ONLY from main. This workflow runs on a push to main,
+# which under the branch rules can only happen when an admin merges the
+# dev -> main pull request. It never runs for pull requests, feature
+# branches, or dev, so work in progress can never reach the live site.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://my1040nr.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require the Cloudflare token secret
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CF_TOKEN" ]; then
+            echo "::error::Missing GitHub secret CLOUDFLARE_API_TOKEN. Add a Cloudflare API token with Cloudflare Pages edit permission for this account (repo Settings, Secrets and variables, Actions) and re-run."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: JavaScript syntax
+        run: |
+          for f in ./*.js; do node --check "$f"; done
+
+      - name: Stage the public site only
+        run: |
+          rm -rf /tmp/site && mkdir -p /tmp/site
+          cp -r assets /tmp/site/assets
+          cp ./*.html ./*.css ./*.js /tmp/site/
+          cp robots.txt sitemap.xml sample-mailing-slip.pdf /tmp/site/ 2>/dev/null || true
+          test -f /tmp/site/index.html
+          test -f /tmp/site/nr.html
+          echo "Files that will be published:"
+          find /tmp/site -type f | sort
+
+      - name: Deploy to Cloudflare Pages (production)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx -y wrangler@latest pages deploy /tmp/site --project-name my1040nr --branch main
+
+      - name: Smoke check the live site
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsSL https://my1040nr.com/nr | grep -q "Prepare your Form 1040-NR"; then
+              echo "Live site is serving the new deployment."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::The live site did not show the new deployment after 2 minutes."
+          exit 1
