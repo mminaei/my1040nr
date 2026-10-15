@@ -4,6 +4,7 @@
 'use strict';
 const d = { statusChanged: 'no', line12: 'no', line13: 'no', income: 'no' };
 let step = 0;
+let addrErr = '', addrWarn = '';
 const app = document.getElementById('app');
 const bar = document.getElementById('bar');
 const YEARS = ['2019', '2020', '2021', '2022', '2023', '2024'];
@@ -50,12 +51,12 @@ function render() {
       field('Last name (family name)', 'lastName', d.lastName) + nav(true);
   }
   if (step === 2) {
-    h = '<h2>Your addresses</h2><p class="small">These are printed on the form because you are filing Form 8843 by itself.</p>' +
+    h = (addrErr ? '<div class="note">' + addrErr + '</div>' : '') + '<h2>Your addresses</h2><p class="small">These are printed on the form because you are filing Form 8843 by itself.</p>' +
       area('Your address in the United States (street, apartment, city, state, ZIP)', 'addrUS', d.addrUS, '4500 College Ave, Apt 12, Austin, TX 78705') +
       area('Your address in your home country (street, city, postal code, country)', 'addrAbroad', d.addrAbroad, '14 MG Road, Pune 411001, India') + nav(true);
   }
   if (step === 3) {
-    h = '<h2>Your visa and passport</h2>' +
+    h = (addrWarn ? '<div class="note">' + addrWarn + '</div>' : '') + '<h2>Your visa and passport</h2>' +
       sel('Type of U.S. visa you entered on', 'visaType', d.visaType || 'F-1',
         [['F-1','F-1 (student)'],['F-2','F-2 (family of F-1)'],['J-1','J-1 (exchange visitor)'],['J-2','J-2 (family of J-1)'],['M-1','M-1 (vocational student)'],['Q-1','Q-1 (cultural exchange)']]) +
       field('Date you entered the United States on this stay', 'entryDate', d.entryDate, 'date') +
@@ -157,8 +158,22 @@ function collect() {
   if (step === 6) { YEARS.forEach(function (y) { grab(['visa' + y]); }); grabRadio('line12', 'line12'); grabRadio('line13', 'line13'); grab(['line14']); }
   if (step === 7) grab(['tin']);
 }
+function parseBlobUS(text) {
+  var m = String(text || '').match(/(\d{5})(-\d{4})?\s*$/);
+  var st = String(text || '').match(/\b([A-Za-z]{2})\s+\d{5}(?:-\d{4})?\s*$/);
+  return { zip: m ? m[1] : '', state: st ? st[1].toUpperCase() : '' };
+}
 function go(dir) {
   collect();
+  if (dir > 0 && step === 2) {
+    addrErr = ''; addrWarn = '';
+    if (String(d.addrUS || '').trim()) {
+      var a = parseBlobUS(d.addrUS);
+      if (!a.zip) { addrErr = 'We could not find a ZIP code at the end of your US address. Write it like: 4500 College Ave, Apt 12, Austin, TX 78705.'; render(); window.scrollTo(0, 0); return; }
+      if (a.state) { var chk = checkUSAddress({ zip: a.zip, state: a.state }); if (chk.warn) addrWarn = chk.warn; }
+      else addrWarn = 'We could not spot a two letter state code before the ZIP in your US address. Check it looks like: Austin, TX 78705.';
+    }
+  }
   step = Math.max(0, Math.min(8, step + dir));
   render();
   window.scrollTo(0, 0);
