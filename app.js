@@ -4,6 +4,7 @@
 'use strict';
 const d = { statusChanged: 'no', line12: 'no', line13: 'no', income: 'no' };
 let step = 0;
+let addrErr = '', addrWarn = '';
 const app = document.getElementById('app');
 const bar = document.getElementById('bar');
 const YEARS = ['2019', '2020', '2021', '2022', '2023', '2024'];
@@ -50,20 +51,21 @@ function render() {
       field('Last name (family name)', 'lastName', d.lastName) + nav(true);
   }
   if (step === 2) {
-    h = '<h2>Your addresses</h2><p class="small">These are printed on the form because you are filing Form 8843 by itself.</p>' +
+    h = (addrErr ? '<div class="note">' + addrErr + '</div>' : '') + '<h2>Your addresses</h2><p class="small">These are printed on the form because you are filing Form 8843 by itself.</p>' +
       area('Your address in the United States (street, apartment, city, state, ZIP)', 'addrUS', d.addrUS, '4500 College Ave, Apt 12, Austin, TX 78705') +
       area('Your address in your home country (street, city, postal code, country)', 'addrAbroad', d.addrAbroad, '14 MG Road, Pune 411001, India') + nav(true);
   }
   if (step === 3) {
-    h = '<h2>Your visa and passport</h2>' +
+    h = (addrWarn ? '<div class="note">' + addrWarn + '</div>' : '') + '<h2>Your visa and passport</h2>' +
       sel('Type of U.S. visa you entered on', 'visaType', d.visaType || 'F-1',
         [['F-1','F-1 (student)'],['F-2','F-2 (family of F-1)'],['J-1','J-1 (exchange visitor)'],['J-2','J-2 (family of J-1)'],['M-1','M-1 (vocational student)'],['Q-1','Q-1 (cultural exchange)']]) +
       field('Date you entered the United States on this stay', 'entryDate', d.entryDate, 'date') +
       '<fieldset><legend>Has your immigration status changed since you entered?</legend>' +
       radios('statusChanged', d.statusChanged, [['no', 'No, it is the same'], ['yes', 'Yes, it changed']]) + '</fieldset>' +
       '<div id="chg"></div>' +
-      field('Country or countries of citizenship', 'citizenship', d.citizenship, 'India') +
-      field('Country that issued your passport', 'passportCountry', d.passportCountry, 'India') +
+      sel('Country of citizenship', 'citizenship', d.citizenship, [['', 'Choose a country']].concat(countryOpts())) +
+      sel('Second country of citizenship (only if you hold two)', 'citizenship2', d.citizenship2, [['', 'I hold only one citizenship']].concat(countryOpts())) +
+      sel('Country that issued your passport', 'passportCountry', d.passportCountry, [['', 'Choose a country']].concat(countryOpts())) +
       field('Passport number', 'passportNo', d.passportNo) + nav(true);
   }
   if (step === 4) {
@@ -100,7 +102,7 @@ function render() {
       '<label for="tin">Social Security number or ITIN (optional)</label><input id="tin" type="password" autocomplete="off" value="' + esc(d.tin) + '" placeholder="Leave blank if you have none">' +
       '<h3 style="margin-top:22px">Check your answers</h3><div class="card"><p class="body">' +
       esc(d.firstName) + ' ' + esc(d.lastName) + ' | ' + esc(d.visaType) + ', entered ' + esc(fmtDate(d.entryDate)) +
-      '<br>Citizenship: ' + esc(d.citizenship) + ' | Days in the U.S.: 2025: ' + esc(d.days2025) + ', 2024: ' + esc(d.days2024) + ', 2023: ' + esc(d.days2023) +
+      '<br>Citizenship: ' + esc(d.citizenship + (d.citizenship2 ? ', ' + d.citizenship2 : '')) + ' | Days in the U.S.: 2025: ' + esc(d.days2025) + ', 2024: ' + esc(d.days2024) + ', 2023: ' + esc(d.days2023) +
       '<br>School: ' + esc((d.school || '').split('\n')[0]) + '</p></div>' +
       '<div class="btnrow"><button class="btn2" onclick="go(-1)">Back</button>' +
       '<button class="btn" onclick="generate()">Make my PDF</button></div>' +
@@ -109,7 +111,7 @@ function render() {
   if (step === 8) {
     h = '<h2>Your PDF is downloading</h2>' +
       '<div class="ok">Print it, sign Form 8843 on its page 2 where it says "Sign here", and mail it to the address on the slip by <strong>June 15, 2026</strong>' + (d.income === 'yes' ? '. Remember: because you had U.S. income, you must also file Form 1040-NR by April 15, 2026; Form 8843 by itself is not enough' : '') + '.</div>' +
-      '<p class="body">Nothing about you was sent to us or stored anywhere. This tab still holds your answers in its memory.</p>' +
+      '<p class="body">Nothing about you was sent to anyone or stored anywhere. This tab still holds your answers in its memory.</p>' +
       '<div class="btnrow"><button class="btn" onclick="eraseAll()">Erase everything now</button></div>';
   }
   app.innerHTML = h;
@@ -150,14 +152,28 @@ function collect() {
   if (step === 0) { grabRadio('income', 'income'); grab(['firstYear', 'priorYears']); }
   if (step === 1) grab(['firstName', 'lastName']);
   if (step === 2) grab(['addrUS', 'addrAbroad']);
-  if (step === 3) { grab(['visaType', 'entryDate', 'citizenship', 'passportCountry', 'passportNo', 'currentStatus', 'changeDate', 'prevStatus']); grabRadio('statusChanged', 'statusChanged'); if (d.statusChanged !== 'yes') d.currentStatus = d.visaType; }
+  if (step === 3) { grab(['visaType', 'entryDate', 'citizenship', 'citizenship2', 'passportCountry', 'passportNo', 'currentStatus', 'changeDate', 'prevStatus']); grabRadio('statusChanged', 'statusChanged'); if (d.statusChanged !== 'yes') d.currentStatus = d.visaType; }
   if (step === 4) grab(['days2025', 'days2024', 'days2023', 'daysExcluded']);
   if (step === 5) grab(['school', 'director']);
   if (step === 6) { YEARS.forEach(function (y) { grab(['visa' + y]); }); grabRadio('line12', 'line12'); grabRadio('line13', 'line13'); grab(['line14']); }
   if (step === 7) grab(['tin']);
 }
+function parseBlobUS(text) {
+  var m = String(text || '').match(/(\d{5})(-\d{4})?\s*$/);
+  var st = String(text || '').match(/\b([A-Za-z]{2})\s+\d{5}(?:-\d{4})?\s*$/);
+  return { zip: m ? m[1] : '', state: st ? st[1].toUpperCase() : '' };
+}
 function go(dir) {
   collect();
+  if (dir > 0 && step === 2) {
+    addrErr = ''; addrWarn = '';
+    if (String(d.addrUS || '').trim()) {
+      var a = parseBlobUS(d.addrUS);
+      if (!a.zip) { addrErr = 'We could not find a ZIP code at the end of your US address. Write it like: 4500 College Ave, Apt 12, Austin, TX 78705.'; render(); window.scrollTo(0, 0); return; }
+      if (a.state) { var chk = checkUSAddress({ zip: a.zip, state: a.state }); if (chk.warn) addrWarn = chk.warn; }
+      else addrWarn = 'We could not spot a two letter state code before the ZIP in your US address. Check it looks like: Austin, TX 78705.';
+    }
+  }
   step = Math.max(0, Math.min(8, step + dir));
   render();
   window.scrollTo(0, 0);

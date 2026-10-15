@@ -14,7 +14,7 @@
     tripsText: '', appliedGreenCard: 'no', everGreenCard: 'no', changedStatus: 'no',
     changeDetail: '', filedBefore: 'no', priorFiling: '', treatyForeignTaxed: 'no', tin: ''
   };
-  var step = 0, residency = null, calc = null, pdfUrl = null, det = null, stateRes = null;
+  var step = 0, residency = null, calc = null, pdfUrl = null, det = null, stateRes = null, addrWarn = '';
 
   function el(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; }
   function field(label, name, val, opts) {
@@ -82,7 +82,14 @@
       }
       step = 2;
     }
-    else if (step === 2) step = 3;
+    else if (step === 2) {
+      if (d.addrWhere === 'us') {
+        var chk = checkUSAddress(d.addrUS);
+        if (chk.error) { message('Check your US address', '<p>' + chk.error + '</p>', 'Back to the address', function () { step = 2; render(); }); return; }
+        addrWarn = chk.warn || '';
+      }
+      step = 3;
+    }
     else if (step === 3) {
       if (num(d.wagesW2) + num(d.wages1042) + num(d.scholarshipTaxable) <= 0) {
         message('No income to report?',
@@ -143,7 +150,7 @@
         sel('Where should the IRS mail you?', 'addrWhere', d.addrWhere, [['us', 'A US address'], ['abroad', 'An address outside the US']]) +
         (us
           ? field('US street address', 'addrUS.street', d.addrUS.street) + field('Apartment (optional)', 'addrUS.apt', d.addrUS.apt) +
-            field('City', 'addrUS.city', d.addrUS.city) + field('State (2 letters)', 'addrUS.state', d.addrUS.state) + field('ZIP code', 'addrUS.zip', d.addrUS.zip)
+            field('City', 'addrUS.city', d.addrUS.city) + sel('State', 'addrUS.state', d.addrUS.state, [['', 'Choose a state']].concat(US_STATES.map(function (s) { return [s, s]; }))) + field('ZIP code', 'addrUS.zip', d.addrUS.zip)
           : field('Street address abroad', 'addrAbroad.street', d.addrAbroad.street) + field('City', 'addrAbroad.city', d.addrAbroad.city) +
             field('Province or region', 'addrAbroad.region', d.addrAbroad.region) + field('Postal code', 'addrAbroad.postal', d.addrAbroad.postal) +
             field('Country', 'addrAbroad.country', d.addrAbroad.country)),
@@ -152,7 +159,7 @@
       if (aw) aw.onchange = function () { d.addrWhere = aw.value; render(); };
     }
     if (step === 3) {
-      shell('Step 3 of 6: your documents',
+      shell('Step 3 of 6: your documents', (addrWarn ? '<div class="note">' + addrWarn + '</div>' : '') +
         '<p class="note">Copy the numbers from your forms. If you have several W-2s, add their boxes together. Leave a section at zero if you do not have that form.</p>' +
         '<h3>Form W-2 (add up all of them)</h3>' +
         field('Box 1: wages, tips, other compensation', 'wagesW2', d.wagesW2, { inputmode: 'decimal' }) +
@@ -176,8 +183,8 @@
         sel('Your tax treaty country (residence country with a US treaty claim)', 'treatyCountry', d.treatyCountry,
           [['', 'No treaty claim'], ['China', 'China (students: $5,000 of wages exempt)'], ['India', 'India (students: standard deduction allowed)'], ['other', 'Another country (not covered yet)']]) +
         field('Months you claimed this treaty benefit in earlier years (0 if none)', 'treatyMonthsPrior', d.treatyMonthsPrior, { type: 'number', inputmode: 'numeric' }) +
-        field('Country or countries of citizenship', 'citizenship', d.citizenship) +
-        field('Country where you claim tax residence', 'taxResidence', d.taxResidence) +
+        sel('Country of citizenship', 'citizenship', d.citizenship, [['', 'Choose a country']].concat(countryOpts())) +
+        sel('Country where you claim tax residence', 'taxResidence', d.taxResidence, [['', 'Choose a country']].concat(countryOpts())) +
         '<label class="field"><span>Your trips in and out of the US during 2025, one per line: entry date, exit date (MM/DD/YYYY). Leave blank if you never left.</span>' +
         '<textarea name="tripsText" rows="4" placeholder="01/04/2025, 12/18/2025">' + String(d.tripsText || '').replace(/</g, '&lt;') + '</textarea></label>' +
         sel('Have you ever applied to become a green card holder?', 'appliedGreenCard', d.appliedGreenCard, [['no', 'No'], ['yes', 'Yes']]) +
