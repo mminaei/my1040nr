@@ -159,7 +159,7 @@ For each state touched, evaluate in this order and output one result with a plai
 
 ## 10. ARCHITECTURE (FOUNDER DECISION)
 
-The tax engine (interview, residency and determination logic, calculations, treaty tables, state rules, PDF generation including both mailing slips) is ONE local-only codebase. It runs as the web app at my1040nr.com, entirely in the student's browser. Documents and answers are processed locally and are never sent to us; the server serves static files only and stores nothing.
+The tax engine (interview, residency and determination logic, calculations, treaty tables, state rules, PDF generation including both mailing slips) is ONE local-only codebase. It runs as the web app at my1040nr.com, entirely in the student's browser. Documents and answers are processed locally and are never sent to anyone; the server serves static files only and stores nothing.
 
 Tax rules are versioned per tax year, and the summary page of every generated PDF prints the rules version used (for example "Prepared with My1040NR rules 2025.1.0"), so any return can be traced to the exact rules that produced it.
 

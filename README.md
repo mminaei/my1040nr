@@ -6,7 +6,7 @@ Every nonresident student or scholar in the United States must file at least For
 
 ## The privacy model is the product
 
-- **Processed on the student's device, never sent to us.** When a student opens a document (a W-2, a 1042-S), the app reads it locally on their machine. Documents and answers are never transmitted to us, and there is no server storing returns.
+- **Processed on the student's device, never sent to anyone.** When a student opens a document (a W-2, a 1042-S), the app reads it locally on their machine. Documents and answers are never transmitted to us, and there is no server storing returns.
 - **No accounts, no saving.** One session. Closing the tab erases everything.
 - **The SSN is asked last**, on one screen, right before the PDF is generated, and it is never transmitted or stored.
 - **The product is a PDF, not a filing.** The student downloads a ready-to-mail package (a mailing slip first, then the official IRS form, filled in), signs it, and mails it themselves. My1040NR transmits nothing to the IRS.

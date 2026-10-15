@@ -109,7 +109,7 @@ function render() {
   if (step === 8) {
     h = '<h2>Your PDF is downloading</h2>' +
       '<div class="ok">Print it, sign Form 8843 on its page 2 where it says "Sign here", and mail it to the address on the slip by <strong>June 15, 2026</strong>' + (d.income === 'yes' ? '. Remember: because you had U.S. income, you must also file Form 1040-NR by April 15, 2026; Form 8843 by itself is not enough' : '') + '.</div>' +
-      '<p class="body">Nothing about you was sent to us or stored anywhere. This tab still holds your answers in its memory.</p>' +
+      '<p class="body">Nothing about you was sent to anyone or stored anywhere. This tab still holds your answers in its memory.</p>' +
       '<div class="btnrow"><button class="btn" onclick="eraseAll()">Erase everything now</button></div>';
   }
   app.innerHTML = h;

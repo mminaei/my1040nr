@@ -152,7 +152,7 @@ async function makeFrontPages(PDFLib, d) {
   draw(p, 'Department of the Treasury', M + 12, ly + 54, 11, bold);
   draw(p, 'Internal Revenue Service', M + 12, ly + 39, 11, bold);
   draw(p, 'Austin, TX 73301-0215', M + 12, ly + 24, 11, bold);
-  draw(p, 'From My1040NR.com. Your information was never sent to us or stored.', M, 44, 9);
+  draw(p, 'From My1040NR.com. Your information was never sent to anyone or stored.', M, 44, 9);
   draw(p, 'Prepared with My1040NR rules ' + RULES_VERSION, M, 32, 9);
   /* Page 2: what to do next */
   p = doc.addPage([W, H]); y = H - 56;
