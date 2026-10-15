@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main, dev]
   push:
-    branches: [dev]
+    branches: [dev, main]
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -11,5 +11,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: JavaScript syntax
         run: |
-          node --check app.js
-          node --check app-core.js
+          for f in ./*.js; do node --check "$f"; done

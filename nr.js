@@ -16,6 +16,26 @@
   };
   var step = 0, residency = null, calc = null, pdfUrl = null, det = null, stateRes = null, addrWarn = '';
 
+  /* Document upload and side-by-side review (spec Section 12). Extracted
+     values are candidates only: each one must be confirmed by the student
+     against the picture of the form before Continue unlocks. */
+  var uploads = [], activeUpload = 0, reviewing = false, selectedField = null, uploadSeq = 0;
+  var W2_FIELDS = [
+    ['wagesW2', 'Box 1: wages, tips, other compensation'],
+    ['fedWithheldW2', 'Box 2: federal income tax withheld'],
+    ['ssTaxW2', 'Box 4: Social Security tax withheld'],
+    ['medTaxW2', 'Box 6: Medicare tax withheld'],
+    ['stCode', 'Box 15: state (two letters)'],
+    ['stWages', 'Box 16: state wages'],
+    ['stWithheld', 'Box 17: state tax withheld']
+  ];
+  var S1042_FIELDS = [
+    ['wages1042', 'Gross income (box 2)'],
+    ['withheld1042', 'Federal tax withheld (box 7a)']
+  ];
+  function fieldDefs(kind) { return kind === 'w2' ? W2_FIELDS : S1042_FIELDS; }
+  function isStateKey(kind, key) { return kind === 'w2' && (key === 'stCode' || key === 'stWages' || key === 'stWithheld'); }
+
   function el(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; }
   function field(label, name, val, opts) {
     opts = opts || {};
@@ -117,6 +137,271 @@
     render();
   }
 
+  function uploadPanelHtml() {
+    return '<div class="upload-panel"><h3>Have your W-2 or 1042-S as a PDF? Let this page read it</h3>' +
+      '<p>Open the PDF and the numbers are read <strong>on this device only</strong>. The file is never sent anywhere and nothing is stored. You then check every number against a picture of your own form and confirm each one before it is used. Nothing is used on extraction alone.</p>' +
+      '<label class="field"><span>W-2 PDF (you can add several)</span><input type="file" data-kind="w2" accept="application/pdf" multiple></label>' +
+      '<label class="field"><span>1042-S PDF</span><input type="file" data-kind="s1042" accept="application/pdf" multiple></label>' +
+      '<p class="upload-status"></p></div>';
+  }
+  function bindUploadInputs(scope) {
+    if (!scope || !window.DocExtract) return;
+    var inputs = scope.querySelectorAll('input[type="file"][data-kind]');
+    inputs.forEach(function (inp) {
+      inp.onchange = function () {
+        if (!inp.files || !inp.files.length) return;
+        var status = scope.querySelector('.upload-status');
+        handleFiles(inp.getAttribute('data-kind'), inp.files, status, inp);
+        inp.value = '';
+      };
+    });
+  }
+  function handleFiles(kind, files, status, input) {
+    var list = Array.prototype.slice.call(files);
+    if (status) status.textContent = 'Reading on your device...';
+    if (input) input.disabled = true;
+    var chain = Promise.resolve(), added = 0, firstNew = -1;
+    list.forEach(function (file) {
+      chain = chain.then(function () {
+        return window.DocExtract.loadFile(file).then(function (doc) {
+          if (doc.type !== 'unknown' && doc.type !== kind) {
+            if (status) status.textContent = 'That file looks like a ' + (doc.type === 'w2' ? 'Form W-2' : 'Form 1042-S') + ', so it was not added here. Use the other upload box for it.';
+            return;
+          }
+          var entry = makeEntry(kind, doc);
+          uploads.push(entry);
+          if (firstNew < 0) firstNew = uploads.length - 1;
+          added++;
+        }).catch(function () {
+          if (status) status.textContent = 'That file could not be read as a PDF. You can type the numbers by hand instead.';
+        });
+      });
+    });
+    chain.then(function () {
+      if (input) input.disabled = false;
+      if (added > 0) { reviewing = true; activeUpload = firstNew; selectedField = null; render(); }
+    });
+  }
+  function makeEntry(kind, doc) {
+    var fields = {}, found = 0;
+    fieldDefs(kind).forEach(function (df) {
+      var f = doc.fields[df[0]];
+      if (f) found++;
+      fields[df[0]] = { value: f ? f.value : '', confirmed: false, page: f ? f.page : 0, rect: f ? f.rect : null, found: !!f };
+    });
+    return { id: ++uploadSeq, kind: kind, name: doc.name, doc: doc, fields: fields, noStateRow: false, anyText: doc.anyText, foundCount: found };
+  }
+  function isFieldDone(entry, key) {
+    if (isStateKey(entry.kind, key) && entry.noStateRow) return true;
+    return !!entry.fields[key].confirmed;
+  }
+  function entryProgress(entry) {
+    var defs = fieldDefs(entry.kind), done = 0;
+    defs.forEach(function (df) { if (isFieldDone(entry, df[0])) done++; });
+    return { done: done, total: defs.length };
+  }
+  function allConfirmed() {
+    return uploads.length > 0 && uploads.every(function (u) { var p = entryProgress(u); return p.done === p.total; });
+  }
+  function totalProgress() {
+    var done = 0, total = 0;
+    uploads.forEach(function (u) { var p = entryProgress(u); done += p.done; total += p.total; });
+    return { done: done, total: total };
+  }
+  function finishReview() {
+    var sum = function (kind, key) {
+      return uploads.filter(function (u) { return u.kind === kind; }).reduce(function (a, u) {
+        return a + num(u.fields[key] ? u.fields[key].value : '');
+      }, 0);
+    };
+    var moneyStr = function (n) { return n ? String(n) : ''; };
+    d.wagesW2 = moneyStr(sum('w2', 'wagesW2'));
+    d.fedWithheldW2 = moneyStr(sum('w2', 'fedWithheldW2'));
+    d.ssTaxW2 = moneyStr(sum('w2', 'ssTaxW2'));
+    d.medTaxW2 = moneyStr(sum('w2', 'medTaxW2'));
+    d.wages1042 = moneyStr(sum('s1042', 'wages1042'));
+    d.withheld1042 = moneyStr(sum('s1042', 'withheld1042'));
+    var byState = {};
+    uploads.filter(function (u) { return u.kind === 'w2' && !u.noStateRow; }).forEach(function (u) {
+      var code = String(u.fields.stCode.value || '').toUpperCase();
+      if (!code) return;
+      if (!byState[code]) byState[code] = { wages: 0, withheld: 0 };
+      byState[code].wages += num(u.fields.stWages.value);
+      byState[code].withheld += num(u.fields.stWithheld.value);
+    });
+    var codes = Object.keys(byState);
+    if (codes.length) {
+      codes.sort(function (a, b) { return byState[b].wages - byState[a].wages; });
+      d.stCode = codes[0];
+      d.stWages = moneyStr(byState[codes[0]].wages);
+      d.stWithheld = moneyStr(byState[codes[0]].withheld);
+    } else { d.stCode = ''; d.stWages = ''; d.stWithheld = ''; }
+    var sch = document.getElementById('rv-scholarship');
+    if (sch) d.scholarshipTaxable = sch.value;
+    reviewing = false;
+    if (num(d.wagesW2) + num(d.wages1042) + num(d.scholarshipTaxable) <= 0) {
+      message('No income to report?',
+        '<p>You confirmed no wages and no taxable scholarship. If you truly had no US income in 2025, you most likely only need <a href="prepare.html">Form 8843</a>, not a 1040-NR. If you did have income, go back and check the numbers on your documents.</p>',
+        'Back to documents', function () { step = 3; render(); });
+      return;
+    }
+    step = 4;
+    render();
+  }
+
+  function renderReview() {
+    app.innerHTML = '';
+    var wrap = el('<section class="card"></section>');
+    wrap.appendChild(el('<h2>Step 3 of 6: check the numbers we read</h2>'));
+    wrap.appendChild(el('<p>Your document is on the left and the numbers we read are on the right, in large type. Compare each number with your form. Click <strong>This matches</strong> and the number turns green. You can also fix a number first; a fixed number needs a fresh click. Continue unlocks only when every number is green.</p>'));
+    var entry = uploads[activeUpload];
+    if (!entry) { reviewing = false; render(); return; }
+    /* document chips */
+    var chips = el('<div class="doc-chips"></div>');
+    uploads.forEach(function (u, i) {
+      var p = entryProgress(u);
+      var b = el('<button type="button" class="doc-chip' + (i === activeUpload ? ' active' : '') + '">' +
+        (u.kind === 'w2' ? 'W-2' : '1042-S') + ': ' + u.name.replace(/</g, '&lt;') + ' (' + p.done + ' of ' + p.total + ' confirmed)</button>');
+      b.onclick = function () { activeUpload = i; selectedField = null; renderReview(); };
+      chips.appendChild(b);
+      var rm = el('<button type="button" class="doc-chip remove" title="Remove this document">x</button>');
+      rm.onclick = function () {
+        uploads.splice(i, 1);
+        if (!uploads.length) { reviewing = false; render(); return; }
+        if (activeUpload >= uploads.length) activeUpload = uploads.length - 1;
+        selectedField = null; renderReview();
+      };
+      chips.appendChild(rm);
+    });
+    wrap.appendChild(chips);
+    if (!entry.anyText) {
+      wrap.appendChild(el('<p class="note">We could not read any numbers from this file. It may be a scanned picture of the form. The picture is still shown: type each number from it and confirm every one.</p>'));
+    } else if (entry.foundCount === 0) {
+      wrap.appendChild(el('<p class="note">We could not match the boxes in this file to our form. Type each number from the picture and confirm every one.</p>'));
+    }
+    /* side by side */
+    var grid = el('<div class="review-grid"></div>');
+    var left = el('<div class="docview"><div class="canvas-wrap"></div></div>');
+    grid.appendChild(left);
+    var right = el('<div class="review-fields"></div>');
+    var rowsByKey = {};
+    fieldDefs(entry.kind).forEach(function (df) {
+      var key = df[0], f = entry.fields[key];
+      var row = el('<div class="rv-field"></div>');
+      row.setAttribute('data-key', key);
+      var lab = el('<label></label>');
+      lab.textContent = df[1];
+      row.appendChild(lab);
+      var inp = el('<input inputmode="' + (key === 'stCode' ? 'text' : 'decimal') + '" autocomplete="off">');
+      inp.value = f.value;
+      row.appendChild(inp);
+      var foot = el('<div class="rv-foot"></div>');
+      var chip = el('<span class="chip"></span>');
+      foot.appendChild(chip);
+      var btn = el('<button type="button" class="btn rv-confirm">This matches</button>');
+      foot.appendChild(btn);
+      row.appendChild(foot);
+      var paint = function () {
+        var absent = isStateKey(entry.kind, key) && entry.noStateRow;
+        row.className = 'rv-field' + (absent ? ' absent' : (f.confirmed ? ' ok' : ' needs'));
+        chip.className = 'chip' + (absent ? '' : (f.confirmed ? ' ok' : ' needs'));
+        chip.textContent = absent ? 'No state row' : (f.confirmed ? 'Confirmed' : 'Needs review');
+        inp.disabled = absent;
+        btn.disabled = absent;
+      };
+      inp.addEventListener('input', function () {
+        f.value = inp.value; f.confirmed = false; paint(); refreshChrome();
+      });
+      inp.addEventListener('focus', function () { selectedField = key; drawSource(); });
+      row.addEventListener('click', function () { selectedField = key; drawSource(); });
+      btn.onclick = function () {
+        var v = String(inp.value).trim();
+        if (key === 'stCode') {
+          var up = v.toUpperCase();
+          if (!/^[A-Z]{2}$/.test(up) || US_STATES.indexOf(up) < 0) { chip.textContent = 'Enter the two state letters'; return; }
+          inp.value = up; f.value = up;
+        } else if (v === '' || isNaN(num(v)) || num(v) < 0) {
+          chip.textContent = 'Enter the number from your form'; return;
+        }
+        f.value = inp.value; f.confirmed = true; paint(); refreshChrome();
+      };
+      rowsByKey[key] = { paint: paint };
+      paint();
+      right.appendChild(row);
+    });
+    if (entry.kind === 'w2') {
+      var ns = el('<label class="rv-nostate"><input type="checkbox"> This W-2 has no state row (boxes 15 to 17 are empty)</label>');
+      var cb = ns.querySelector('input');
+      cb.checked = !!entry.noStateRow;
+      cb.onchange = function () {
+        entry.noStateRow = cb.checked;
+        ['stCode', 'stWages', 'stWithheld'].forEach(function (k) { if (rowsByKey[k]) rowsByKey[k].paint(); });
+        refreshChrome();
+      };
+      right.appendChild(ns);
+    }
+    var sch = el('<label class="field"><span>Taxable scholarship that is not on these forms (optional)</span><input id="rv-scholarship" inputmode="decimal" value="' + String(d.scholarshipTaxable || '').replace(/"/g, '&quot;') + '"></label>');
+    right.appendChild(sch);
+    var more = el('<div class="upload-panel compact"><h3>Add another document</h3>' +
+      '<label class="field"><span>W-2 PDF</span><input type="file" data-kind="w2" accept="application/pdf" multiple></label>' +
+      '<label class="field"><span>1042-S PDF</span><input type="file" data-kind="s1042" accept="application/pdf" multiple></label>' +
+      '<p class="upload-status"></p></div>');
+    right.appendChild(more);
+    grid.appendChild(right);
+    wrap.appendChild(grid);
+    /* progress + nav */
+    var prog = el('<p class="rv-progress"></p>');
+    wrap.appendChild(prog);
+    var nav = el('<div class="row"></div>');
+    var back = el('<button type="button" class="btn secondary">Back</button>');
+    back.onclick = function () { step = 2; render(); };
+    nav.appendChild(back);
+    var manual = el('<button type="button" class="btn secondary">Type the numbers instead</button>');
+    manual.onclick = function () { uploads = []; reviewing = false; render(); };
+    nav.appendChild(manual);
+    var cont = el('<button type="button" class="btn" id="rv-continue">Continue</button>');
+    cont.onclick = function () { if (allConfirmed()) finishReview(); };
+    nav.appendChild(cont);
+    wrap.appendChild(nav);
+    app.appendChild(wrap);
+    bindUploadInputs(wrap);
+    function drawSource() {
+      var cw = left.querySelector('.canvas-wrap');
+      cw.innerHTML = '';
+      var f = selectedField ? entry.fields[selectedField] : null;
+      var pageIdx = f && f.rect ? f.page : firstFieldPage(entry);
+      var pg = entry.doc.pages[pageIdx];
+      if (!pg) return;
+      cw.appendChild(pg.canvas);
+      if (f && f.rect && f.page === pageIdx) {
+        var hl = el('<div class="hl"></div>');
+        hl.style.left = (f.rect.x / pg.w * 100) + '%';
+        hl.style.top = (f.rect.y / pg.h * 100) + '%';
+        hl.style.width = (f.rect.w / pg.w * 100) + '%';
+        hl.style.height = (f.rect.h / pg.h * 100) + '%';
+        cw.appendChild(hl);
+      }
+    }
+    function firstFieldPage(e) {
+      var keys = Object.keys(e.fields);
+      for (var i = 0; i < keys.length; i++) if (e.fields[keys[i]].rect) return e.fields[keys[i]].page;
+      return 0;
+    }
+    function refreshChrome() {
+      var p = totalProgress();
+      prog.textContent = p.done + ' of ' + p.total + ' values confirmed.';
+      cont.disabled = !allConfirmed();
+      var chipBtns = chips.querySelectorAll('.doc-chip:not(.remove)');
+      chipBtns.forEach(function (b, i) {
+        var u = uploads[i]; if (!u) return;
+        var pp = entryProgress(u);
+        b.textContent = (u.kind === 'w2' ? 'W-2' : '1042-S') + ': ' + u.name + ' (' + pp.done + ' of ' + pp.total + ' confirmed)';
+      });
+    }
+    refreshChrome();
+    drawSource();
+  }
+
   function render() {
     if (step === 0) {
       shell('Before you start', '' +
@@ -159,8 +444,10 @@
       if (aw) aw.onchange = function () { d.addrWhere = aw.value; render(); };
     }
     if (step === 3) {
+      if (reviewing) { renderReview(); return; }
       shell('Step 3 of 6: your documents', (addrWarn ? '<div class="note">' + addrWarn + '</div>' : '') +
-        '<p class="note">Copy the numbers from your forms. If you have several W-2s, add their boxes together. Leave a section at zero if you do not have that form.</p>' +
+        uploadPanelHtml() +
+        '<p class="note">Or copy the numbers from your forms by hand. If you have several W-2s, add their boxes together. Leave a section at zero if you do not have that form.</p>' +
         '<h3>Form W-2 (add up all of them)</h3>' +
         field('Box 1: wages, tips, other compensation', 'wagesW2', d.wagesW2, { inputmode: 'decimal' }) +
         field('Box 2: federal income tax withheld', 'fedWithheldW2', d.fedWithheldW2, { inputmode: 'decimal' }) +
@@ -177,6 +464,7 @@
         '<h3>Scholarship or fellowship</h3>' +
         field('Taxable scholarship amount (the part used for living costs, not tuition or books)', 'scholarshipTaxable', d.scholarshipTaxable, { inputmode: 'decimal' }),
         true);
+      bindUploadInputs(app.querySelector('form'));
     }
     if (step === 4) {
       shell('Step 4 of 6: treaty and Schedule OI details',
