@@ -17,11 +17,11 @@ Every nonresident student or scholar in the United States must file at least For
 - Form 8843 (2025) preparation at [my1040nr.com/prepare](https://my1040nr.com/prepare), producing a 4-page PDF: mailing slip, next steps, and the filled official IRS form.
 - Plain-English explainers and checkers on the site: residency (Substantial Presence Test), the word "exempt" explained, state tax determination, forms guide, and extension rules.
 
-## Architecture: one engine, two shells
+## Architecture
 
-All tax logic lives in one shell-agnostic engine (`app-core.js`): interview flow data, field mapping to the official IRS PDFs, rules packages, and PDF assembly (mailing slips plus filled forms). The web page is the first shell. A desktop shell (Tauri, Windows and macOS) wraps the same engine so the app can run fully offline, which is the strongest privacy proof a student can verify: turn on airplane mode and it still works.
+All tax logic lives in one engine (`app-core.js`): interview flow data, field mapping to the official IRS PDFs, and PDF assembly (mailing slips plus filled forms). The web app at my1040nr.com is the shell: it runs entirely in the student's browser, with no server-side processing and nothing stored.
 
-Tax rules ship as signed, versioned packages per tax year. When the rules change, the desktop app applies a **mandatory** update before it will prepare anything: no return is ever generated on rules the app knows are out of date, and every PDF prints the rules version that produced it.
+Tax rules are versioned per tax year, and every PDF prints the rules version that produced it, so any return can be traced to the exact rules behind it.
 
 ## Repository layout
 
@@ -35,7 +35,7 @@ Tax rules ship as signed, versioned packages per tax year. When the rules change
 ## Roadmap
 
 1. Form 1040-NR engine (income, treaty benefits, state determination and preparation) with Form 4868 extension support.
-2. Desktop shell with the mandatory rules update channel.
+2. More income types (Schedule NEC) and more states.
 3. Golden test coverage for the calculation and determination logic.
 
 ## Contributing

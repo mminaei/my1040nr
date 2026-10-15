@@ -157,35 +157,13 @@ For each state touched, evaluate in this order and output one result with a plai
 
 ---
 
-## 10. ARCHITECTURE DECISION AND MANDATORY RULES UPDATES (FOUNDER DECISION 2026-10-14)
+## 10. ARCHITECTURE (FOUNDER DECISION)
 
-DECIDED by the founder on 2026-10-14: one engine, two shells, and mandatory updates when tax rules change.
+The tax engine (interview, residency and determination logic, calculations, treaty tables, state rules, PDF generation including both mailing slips) is ONE local-only codebase. It runs as the web app at my1040nr.com, entirely in the student's browser. Documents and answers are processed locally and are never sent to us; the server serves static files only and stores nothing.
 
-### 10.1 One engine, two shells
-- The tax engine (interview, residency and determination logic, calculations, treaty tables, state rules, PDF generation including both mailing slips) is ONE local-only codebase, written once.
-- Shell A: the web app at my1040nr.com. It runs entirely in the student's browser. Documents and answers are processed locally and are never sent to us; the server, if any, serves static files only and stores nothing.
-- Shell B: a desktop app (Tauri) for Windows and macOS, built from the same codebase. It runs fully offline, which is the product's proof of safety: a student can switch on airplane mode and finish a return.
-- No feature may exist in one shell only. A rule change is made once, in the engine, and ships to both shells. The shells differ only in packaging and in the update mechanism below.
+Tax rules are versioned per tax year, and the summary page of every generated PDF prints the rules version used (for example "Prepared with My1040NR rules 2025.1.0"), so any return can be traced to the exact rules that produced it.
 
-### 10.2 Rules as versioned, signed packages
-- All tax law lives in rules packages, separate from app code: one package per tax year, containing federal rates, brackets, thresholds, treaty tables, mailing addresses, and per-state rules.
-- Every rules package carries: taxYear, rulesVersion (for example 2025.4.1), published timestamp, a validThrough date, a minimum app version, and a plain English "what changed" note. Packages are cryptographically signed; both shells verify the signature before applying a package and refuse anything unsigned or altered.
-- The summary page of every generated PDF prints the rules version used (for example "Prepared with My1040NR rules 2025.4.1"), so any return can be traced to the exact rules that produced it.
-
-### 10.3 Mandatory updates on the desktop app (founder requirement)
-- At launch, and again at the moment before PDF generation, the desktop app fetches a small rules manifest over HTTPS. This is the ONLY network call the app ever makes, and it sends only the app version and current rules versions. It sends no user data, no answers, no identifiers.
-- The manifest states, per tax year, the latest rules version and the MINIMUM allowed rules version. A rules change published by the team raises the minimum.
-- If the installed rules for the chosen tax year are below the minimum, the update is MANDATORY: the app downloads and installs the new signed rules package, shows the plain English "what changed" note, and restarts. The student cannot start a new interview and cannot generate a PDF until the update is applied. There is no "skip" or "remind me later" on a mandatory update.
-- Because sessions hold nothing saved (Section 1 of this spec), a mandatory restart destroys no work: the update check happens at launch, before the interview starts, and the pre-generation check compares the manifest against the rules version the session began with. If a mandatory update landed mid-session, the app says so plainly, explains that the rules changed, and requires the update and a fresh session before any PDF is made. It never generates a PDF with rules it knows are superseded.
-- Offline honesty: the desktop app works fully offline while its rules are inside their validity window. Each rules package's validThrough date covers its filing season. If the app cannot reach the manifest AND the current date is past the validThrough date for the chosen tax year, it must say it cannot confirm the rules are current and must refuse to prepare that year until it can check. It must never silently prepare a return on expired rules.
-- A failed update (network error, bad signature, interrupted download) never applies partially: the app keeps the previous complete package, keeps the mandatory gate in place, and offers a retry. Rollback to the last verified package is automatic on any verification failure.
-- App binary updates ride the same channel (signed Tauri updater). A binary update that carries rules changes is treated as mandatory on the same terms.
-
-### 10.4 Web shell updates
-- The web shell always loads the latest signed rules when the page loads, so it can never run stale rules. The rules version is pinned at session start and stamped on the PDF exactly as on desktop. If the rules are republished mid-session, the web shell applies the same rule as desktop: no PDF on superseded rules; the student is told and the session restarts.
-
-### 10.5 Tests
-- Update tests must prove: the app blocks interview start and blocks PDF generation when below the manifest minimum; the block lifts only after a verified signed package installs; an unsigned or tampered package is rejected and rolled back; the offline-past-validThrough case refuses with the correct message; the manifest request contains no user data (network trace assertion); and every generated PDF carries its rules version stamp.
+A desktop shell was considered earlier and was parked by the founder on 2026-10-15. It is out of scope until he decides otherwise.
 
 ---
 

@@ -1,5 +1,5 @@
-/* My1040NR core: Form 8843 (2025) preparation. Shell-agnostic: runs in the
-   browser today, inside the desktop shell later. No network calls are made
+/* My1040NR core: Form 8843 (2025) preparation. Runs entirely in the
+   browser. No network calls are made
    with user data. Nothing is stored: all state lives in page memory. */
 'use strict';
 const RULES_VERSION = '2025.1.0';
