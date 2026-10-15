@@ -176,8 +176,8 @@
         sel('Your tax treaty country (residence country with a US treaty claim)', 'treatyCountry', d.treatyCountry,
           [['', 'No treaty claim'], ['China', 'China (students: $5,000 of wages exempt)'], ['India', 'India (students: standard deduction allowed)'], ['other', 'Another country (not covered yet)']]) +
         field('Months you claimed this treaty benefit in earlier years (0 if none)', 'treatyMonthsPrior', d.treatyMonthsPrior, { type: 'number', inputmode: 'numeric' }) +
-        field('Country or countries of citizenship', 'citizenship', d.citizenship) +
-        field('Country where you claim tax residence', 'taxResidence', d.taxResidence) +
+        sel('Country of citizenship', 'citizenship', d.citizenship, [['', 'Choose a country']].concat(countryOpts())) +
+        sel('Country where you claim tax residence', 'taxResidence', d.taxResidence, [['', 'Choose a country']].concat(countryOpts())) +
         '<label class="field"><span>Your trips in and out of the US during 2025, one per line: entry date, exit date (MM/DD/YYYY). Leave blank if you never left.</span>' +
         '<textarea name="tripsText" rows="4" placeholder="01/04/2025, 12/18/2025">' + String(d.tripsText || '').replace(/</g, '&lt;') + '</textarea></label>' +
         sel('Have you ever applied to become a green card holder?', 'appliedGreenCard', d.appliedGreenCard, [['no', 'No'], ['yes', 'Yes']]) +

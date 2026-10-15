@@ -62,8 +62,9 @@ function render() {
       '<fieldset><legend>Has your immigration status changed since you entered?</legend>' +
       radios('statusChanged', d.statusChanged, [['no', 'No, it is the same'], ['yes', 'Yes, it changed']]) + '</fieldset>' +
       '<div id="chg"></div>' +
-      field('Country or countries of citizenship', 'citizenship', d.citizenship, 'India') +
-      field('Country that issued your passport', 'passportCountry', d.passportCountry, 'India') +
+      sel('Country of citizenship', 'citizenship', d.citizenship, [['', 'Choose a country']].concat(countryOpts())) +
+      sel('Second country of citizenship (only if you hold two)', 'citizenship2', d.citizenship2, [['', 'I hold only one citizenship']].concat(countryOpts())) +
+      sel('Country that issued your passport', 'passportCountry', d.passportCountry, [['', 'Choose a country']].concat(countryOpts())) +
       field('Passport number', 'passportNo', d.passportNo) + nav(true);
   }
   if (step === 4) {
@@ -100,7 +101,7 @@ function render() {
       '<label for="tin">Social Security number or ITIN (optional)</label><input id="tin" type="password" autocomplete="off" value="' + esc(d.tin) + '" placeholder="Leave blank if you have none">' +
       '<h3 style="margin-top:22px">Check your answers</h3><div class="card"><p class="body">' +
       esc(d.firstName) + ' ' + esc(d.lastName) + ' | ' + esc(d.visaType) + ', entered ' + esc(fmtDate(d.entryDate)) +
-      '<br>Citizenship: ' + esc(d.citizenship) + ' | Days in the U.S.: 2025: ' + esc(d.days2025) + ', 2024: ' + esc(d.days2024) + ', 2023: ' + esc(d.days2023) +
+      '<br>Citizenship: ' + esc(d.citizenship + (d.citizenship2 ? ', ' + d.citizenship2 : '')) + ' | Days in the U.S.: 2025: ' + esc(d.days2025) + ', 2024: ' + esc(d.days2024) + ', 2023: ' + esc(d.days2023) +
       '<br>School: ' + esc((d.school || '').split('\n')[0]) + '</p></div>' +
       '<div class="btnrow"><button class="btn2" onclick="go(-1)">Back</button>' +
       '<button class="btn" onclick="generate()">Make my PDF</button></div>' +
@@ -150,7 +151,7 @@ function collect() {
   if (step === 0) { grabRadio('income', 'income'); grab(['firstYear', 'priorYears']); }
   if (step === 1) grab(['firstName', 'lastName']);
   if (step === 2) grab(['addrUS', 'addrAbroad']);
-  if (step === 3) { grab(['visaType', 'entryDate', 'citizenship', 'passportCountry', 'passportNo', 'currentStatus', 'changeDate', 'prevStatus']); grabRadio('statusChanged', 'statusChanged'); if (d.statusChanged !== 'yes') d.currentStatus = d.visaType; }
+  if (step === 3) { grab(['visaType', 'entryDate', 'citizenship', 'citizenship2', 'passportCountry', 'passportNo', 'currentStatus', 'changeDate', 'prevStatus']); grabRadio('statusChanged', 'statusChanged'); if (d.statusChanged !== 'yes') d.currentStatus = d.visaType; }
   if (step === 4) grab(['days2025', 'days2024', 'days2023', 'daysExcluded']);
   if (step === 5) grab(['school', 'director']);
   if (step === 6) { YEARS.forEach(function (y) { grab(['visa' + y]); }); grabRadio('line12', 'line12'); grabRadio('line13', 'line13'); grab(['line14']); }
