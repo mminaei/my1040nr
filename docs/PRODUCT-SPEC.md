@@ -163,7 +163,7 @@ DECIDED by the founder on 2026-10-14: one engine, two shells, and mandatory upda
 
 ### 10.1 One engine, two shells
 - The tax engine (interview, residency and determination logic, calculations, treaty tables, state rules, PDF generation including both mailing slips) is ONE local-only codebase, written once.
-- Shell A: the web app at my1040nr.com. It runs entirely in the student's browser. Nothing is uploaded; the server, if any, serves static files only.
+- Shell A: the web app at my1040nr.com. It runs entirely in the student's browser. Documents and answers are processed locally and are never sent to us; the server, if any, serves static files only and stores nothing.
 - Shell B: a desktop app (Tauri) for Windows and macOS, built from the same codebase. It runs fully offline, which is the product's proof of safety: a student can switch on airplane mode and finish a return.
 - No feature may exist in one shell only. A rule change is made once, in the engine, and ships to both shells. The shells differ only in packaging and in the update mechanism below.
 
