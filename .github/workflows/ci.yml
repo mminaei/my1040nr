@@ -1,0 +1,15 @@
+name: checks
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [dev]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript syntax
+        run: |
+          node --check app.js
+          node --check app-core.js
