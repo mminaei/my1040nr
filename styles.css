@@ -1,7 +1,7 @@
 :root{--ink:#0f2233;--paper:#fbfaf7;--accent:#0b6e4f;--accent2:#12507a;--muted:#5b6b7a;--card:#ffffff;--line:#e2ded2;--warn:#fff4d6}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.6}
-.wrap{max-width:980px;margin:0 auto;padding:0 20px}
+.wrap{max-width:980px;margin:0 auto;padding:0 24px}
 header{padding:22px 0 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .logo{font-size:23px;font-weight:bold;letter-spacing:.2px}
 .logo span{color:var(--accent)}
@@ -35,7 +35,18 @@ footer{padding:44px 0 36px;color:var(--muted);font-size:14px}
 a{color:var(--accent2)}
 ul{margin:8px 0 8px 20px}
 li{margin-bottom:6px}
-@media(max-width:640px){h1{font-size:34px}nav a{margin-left:12px}}
+@media(max-width:640px){h1{font-size:32px}nav{display:flex;flex-wrap:wrap;gap:6px 14px}nav a{margin-left:0}.wrap{padding:0 20px}.card{padding:18px 16px}section{padding:26px 0 4px}}
+
+/* App shell used by nr.html: same container treatment as .wrap, so the
+   preparer pages keep clear margins instead of running edge to edge. */
+.site-header{max-width:980px;margin:0 auto;padding:22px 24px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px 18px}
+.brand{font-size:23px;font-weight:bold;color:var(--ink);text-decoration:none}
+.site-header nav{display:flex;flex-wrap:wrap;gap:6px 16px}
+.site-header nav a{margin-left:0}
+.site-header + main{max-width:980px;margin:0 auto;padding:6px 24px 0}
+.site-header ~ footer{max-width:980px;margin:0 auto;padding-left:24px;padding-right:24px}
+.lede{font-size:18px;color:#2c3a47;max-width:720px;margin-bottom:20px}
+@media(max-width:640px){.site-header{padding:18px 20px 8px}.site-header + main{padding:6px 20px 0}.site-header ~ footer{padding-left:20px;padding-right:20px}}
 
 /* Document upload and side-by-side review (spec Section 12) */
 .upload-panel{background:#f4f8f5;border:1px solid #b9d8c4;border-radius:10px;padding:16px 18px;margin-bottom:18px}
