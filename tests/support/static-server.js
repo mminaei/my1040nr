@@ -34,7 +34,20 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    const requestedPath = path.resolve(repositoryRoot, `.${pathname}`);
+    if (!pathname.startsWith('/') || pathname.includes('\\') || pathname.includes('\0')) {
+      response.writeHead(400);
+      response.end();
+      return;
+    }
+
+    const segments = pathname.split('/').slice(1);
+    if (segments.some(segment => segment === '' || segment === '.' || segment === '..')) {
+      response.writeHead(400);
+      response.end();
+      return;
+    }
+
+    const requestedPath = path.join(repositoryRoot, ...segments);
     if (!isWithinRoot(requestedPath)) {
       response.writeHead(403);
       response.end();
