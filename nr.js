@@ -586,14 +586,16 @@
       wrap.appendChild(erase);
       app.appendChild(wrap);
     } catch (err) {
-      message('Something went wrong', '<p>The PDF could not be built. Your answers are still on this page: go back and try again. If it keeps failing, the offline copy from GitHub runs the same code.</p>', 'Back', function () { step = 7; render(); });
+      console.error(err);
+      message('Something went wrong', '<p>The PDF could not be built. Your answers are still on this page: go back and try again. If it keeps failing, the offline copy from GitHub runs the same code.</p><p class="note">Error detail: ' + String((err && err.message) || err).replace(/</g, '&lt;') + '</p>', 'Back', function () { step = 7; render(); });
     }
   }
 
-  function textPage(PDFLib, title, lines) {
-    return PDFLib.PDFDocument.create().then(function (doc) {
-      var font = doc.embedFont(PDFLib.StandardFonts.Helvetica);
-      var bold = doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+  async function textPage(PDFLib, title, lines) {
+    var doc = await PDFLib.PDFDocument.create();
+    {
+      var font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      var bold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
       var page = doc.addPage([612, 792]);
       var y = 740;
       page.drawText(title, { x: 56, y: y, size: 16, font: bold }); y -= 28;
@@ -605,7 +607,7 @@
       });
       page.drawText('Prepared with My1040NR, rules version ' + NR_RULES_VERSION + '. Free and open source: my1040nr.com', { x: 56, y: 48, size: 8.5, font: font });
       return doc;
-    });
+    }
   }
   function stateWorksheet(st, s) {
     if (st === 'CA') return 'California income ' + money(s.caAGI) + ' of ' + money(s.totalAll) + ' total (treaty wages added back for California).';
