@@ -1,31 +1,33 @@
-# My1040NR READINESS CHECKLIST (reviewed 2026-10-14)
+# Readiness checklist (reviewed 2026-10-16)
 
-## READY AND VERIFIED
-- Domain: my1040nr.com owned (Porkbun, expires 2027-10-15, auto-renew on, free WHOIS privacy).
-- Website live: all 8 routes return 200 on both my1040nr.com and www.my1040nr.com (home, residency checker, exempt explainer, forms guide, state checker, pricing, legal, sample mailing slip PDF).
-- Product decisions all made and written in the spec (My1040NR-Product-Spec-Dash.md, Sections 1 to 10): students only, always free, PDF only, no transmission, no accounts, one session, SSN last, no "exempt" questions, mailing slip as page 1, state determination and preparation with a second state slip, one local-only engine that runs as the web app.
-- Sample mailing slip built and published.
-- Legal page live with disclaimer, terms, and the no-retention privacy model.
+This checklist separates implemented code and regression coverage from verification of tax law and professional readiness. A working path or passing test does not establish that a tax result is correct or suitable for filing.
 
-## BUILT (first release, 2026-10-14)
-- Form 8843 preparer is LIVE at my1040nr.com/prepare: one-session interview in the browser (no server, no storage), plain-English checks first (income warning, residency year count), SSN or ITIN asked last and optional, and a downloaded PDF of 4 pages: mailing slip, what-to-do-next, then the official IRS Form 8843 (2025) filled and flattened.
-- Verified by an automated test: a sample package was generated outside the browser and inspected; every test value landed in the correct field of the official form, the slip carried the Austin IRS address, and the rules version stamp (2025.1.0) printed.
+## Implemented code paths
 
-## NOT BUILT YET
-- The full Form 1040-NR engine (income, treaty, state). The 8843 flow warns students with income that 1040-NR is also required and gives its April 15, 2026 deadline.
-- Golden test cases exist as requirements in the spec, not yet as written test data.
+- **Form 8843:** `prepare.html`, `app.js`, and `app-core.js` implement a browser interview and PDF package using `assets/f8843-2025.pdf`.
+- **Form 1040-NR:** `nr.html`, `nr.js`, `doc-extract.js`, and `app-core.js` implement a tax-year 2025 preparation path for the currently supported interview inputs, calculations, federal forms, and selected state flows. The federal path includes the W-2/1042-S interview, local PDF extraction with user review/confirmation, and PDF generation.
+- **1040-NR scope limits:** the current interview states that it supports single or married-filing-separately returns without dependents; it does not cover investment, self-employment, or rental income. The project does not prepare Form 4868.
+- **State preparation:** the current engine has CA, NY, MA, and IL form paths, but accepts only one W-2 state row. It does not model state residency, part-year residence, mid-year moves, or multiple state rows.
+- **Regression suite:** `tests/unit/` and `tests/e2e/` cover selected calculation relationships, fixture behavior, browser flows, generated package structure, and privacy boundaries. See `docs/TESTING.md`.
 
-## VERIFICATION PENDING (before any real student uses it)
-- IRS mailing addresses on the slips: verify against the tax year 2025 form instructions (spec marks these TODO_VERIFY).
-- State filing thresholds in the state checker and spec (MA, NY, IL reference values, CA tables): verify against each state's 2025 instructions.
-- Form line mappings and treaty tables for tax year 2025: verify against official IRS instructions and Publication 901 when the engine is built.
-- CPA or Enrolled Agent review and sign-off of the engine and treaty tables.
+These are implementation-status statements only. The code is not a professional determination that a user qualifies for a form or that the generated return is complete, correct, or ready to file.
 
-## FOUNDER ITEMS PENDING
-- Waitlist is NOT collecting emails: the form still points at a TODO-FOUNDER Buttondown placeholder. Needs a real Buttondown account and embed URL from the founder.
-- Trademark search for the My1040NR name: not done.
-- Support email on the domain (for example support@my1040nr.com forwarding): not set up.
-- Business posture before launch: form an LLC, errors and omissions insurance, and a short written security policy. The local-only design removes the server risk, but the paper trail should exist before launch. The PDF-only, user-mails-it model means no EFIN and no e-file approval are required, because the product transmits nothing.
+## Verification still required
 
-## SUGGESTED FIRST BUILD (smallest shippable piece)
-Form 8843 only: residency checker plus the 8843 interview plus PDF with mailing slip. It serves the largest group (every nonresident student must file it, even with no income), needs no income documents and no tax tables, asks the SSN or ITIN late like everything else, and it is the exact form the incumbent charges $19.95 for. The full 1040-NR engine comes second.
+- Verify federal residency, income, deduction, treaty, withholding, tax, line-mapping, mailing-address, and deadline rules against official instructions and publications for the applicable tax year. Keep unsupported expectations marked `TODO_VERIFY`.
+- Verify all state thresholds, rates, allocations, calculations, form mappings, mailing addresses, and filing guidance against each relevant state's tax-year-specific instructions.
+- Verify each treaty rule against authoritative IRS treaty sources, including applicable treaty articles and IRS publications.
+- Obtain CPA or Enrolled Agent review and sign-off of the federal and state rules, calculations, forms, and generated output before real-world reliance.
+- Expand state data and logic before supporting people with multiple state rows, state residency questions, part-year residence, or moves between states. A missing W-2 state row cannot establish that no state filing obligation exists.
+
+The checked-in PDFs in `assets/` are form templates and do not, by themselves, verify tax rules. Source and verification metadata for state regression cases is recorded in `tests/fixtures/state-cases.js`. Passing tests must not be presented as tax-professional validation.
+
+## Product and operational items
+
+- The app is designed as a static, client-side site with no collection or persistence of taxpayer data. Keep all test inputs fictional; never put taxpayer information in the repository, test output, or artifacts.
+- The waitlist still points at a `TODO-FOUNDER` Buttondown placeholder; it is not currently an email collection feature.
+- Trademark review, a domain support email, and the founder's business, insurance, and written security-policy decisions remain pending.
+
+## Release posture
+
+The implemented 1040-NR path and its regression suite are not equivalent to a verified tax product. Do not claim professional readiness until authoritative tax-year source verification and qualified professional review are complete, and do not rely on unsupported or `TODO_VERIFY` outcomes for an individual return.

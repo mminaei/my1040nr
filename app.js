@@ -123,7 +123,7 @@ function wire() {
       r.addEventListener('change', function () {
         grabRadio('income', 'income');
         document.getElementById('incomeNote').innerHTML = d.income === 'yes'
-          ? '<div class="notice"><strong>Important:</strong> with U.S. income, Form 8843 alone is not your whole filing. You also need Form 1040-NR (that part of My1040NR is being built next). You can still prepare your 8843 here now, and your slip will remind you of the April 15, 2026 deadline for the 1040-NR package.</div>' : '';
+          ? '<div class="notice"><strong>Important:</strong> Form 8843 alone is not your whole filing when you have U.S. income. You also need Form 1040-NR; use the <a href="nr.html">Form 1040-NR preparer</a>. You can still prepare your 8843 here, and your slip will remind you of the April 15, 2026 deadline.</div>' : '';
       });
     });
   }

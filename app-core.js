@@ -185,10 +185,6 @@ async function buildPackage(PDFLib, formBytes, d) {
   gp.forEach(function (pg) { out.addPage(pg); });
   return await out.save();
 }
-if (typeof module !== 'undefined') {
-  module.exports = { buildPackage, fill8843, studentYearCount, RULES_VERSION, FIELD, CHECK };
-}
-
 /* ================= Form 1040-NR pipeline (tax year 2025) =================
    Scope v1: nonresident alien students with effectively connected income from
    Form W-2 and/or Form 1042-S (wages and taxable scholarship/fellowship),
@@ -710,4 +706,12 @@ async function fillIL(PDFLib, bytes, d, s, fed) {
   form.flatten();
   await drawMarks(PDFLib, doc, ilMarks);
   return doc;
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    buildPackage, fill8843, studentYearCount, RULES_VERSION, FIELD, CHECK,
+    computeNR, residency2025, stateDetermination, stateCalc, computeCA,
+    computeNY, computeMA, computeIL, checkUSAddress
+  };
 }
