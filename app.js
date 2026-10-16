@@ -1,5 +1,5 @@
 /* My1040NR web shell for the Form 8843 flow. All state lives in this page's
-   memory only. No storage, no cookies, no analytics, no network calls with
+   memory only. No storage, no cookies, and no network calls with
    user data. Reloading or closing the tab erases everything. */
 'use strict';
 const d = { statusChanged: 'no', line12: 'no', line13: 'no', income: 'no' };
