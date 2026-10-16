@@ -293,6 +293,8 @@
       lab.textContent = df[1];
       row.appendChild(lab);
       var inp = el('<input inputmode="' + (key === 'stCode' ? 'text' : 'decimal') + '" autocomplete="off">');
+      inp.id = 'review-' + key;
+      lab.htmlFor = inp.id;
       inp.value = f.value;
       row.appendChild(inp);
       var foot = el('<div class="rv-foot"></div>');

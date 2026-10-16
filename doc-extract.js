@@ -91,7 +91,8 @@
   function amountFor(items, label, claimed) {
     var m = label.str.match(/(\$?\d{1,3}(?:,\d{3})*(?:\.\d{2})|\$?\d+\.\d{2})\s*$/);
     if (m && isMoney(m[1])) return { value: moneyVal(m[1]), item: label, inline: true };
-    var best = null, bestScore = Infinity;
+    var sameRowBest = null, sameRowScore = Infinity;
+    var belowBest = null, belowScore = Infinity;
     items.forEach(function (it) {
       if (it === label || claimed.indexOf(it) >= 0 || it.page !== label.page) return;
       var v = null;
@@ -103,10 +104,15 @@
       var dy = it.rect.y - label.rect.y;
       var dx = it.rect.x - label.rect.x;
       var score = null;
-      if (Math.abs(dy) <= 7 && dx >= -4) score = Math.abs(dx) + Math.abs(dy) * 3;
-      else if (dy >= 4 && dy <= 50 && dx >= -34) score = 200 + dy + Math.max(0, -dx);
-      if (score !== null && score < bestScore) { bestScore = score; best = { value: v, item: it, inline: false }; }
+      if (Math.abs(dy) <= 7 && dx >= -4) {
+        score = Math.abs(dx) + Math.abs(dy) * 3;
+        if (score < sameRowScore) { sameRowScore = score; sameRowBest = { value: v, item: it, inline: false }; }
+      } else if (dy >= 4 && dy <= 50 && dx >= -34) {
+        score = 200 + dy + Math.max(0, -dx);
+        if (score < belowScore) { belowScore = score; belowBest = { value: v, item: it, inline: false }; }
+      }
     });
+    var best = sameRowBest || belowBest;
     if (best) claimed.push(best.item);
     return best;
   }
