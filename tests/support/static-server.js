@@ -11,10 +11,6 @@ const mimeTypes = new Map([
 ]);
 const port = Number(process.env.PORT || 4173);
 
-function isWithinRoot(filePath) {
-  return filePath === repositoryRoot || filePath.startsWith(repositoryRoot + path.sep);
-}
-
 const server = http.createServer(async (request, response) => {
   try {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -40,7 +36,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     const requestedPath = path.resolve(repositoryRoot, `.${pathname}`);
-    if (!isWithinRoot(requestedPath)) {
+    if (requestedPath !== repositoryRoot && !requestedPath.startsWith(repositoryRoot + path.sep)) {
       response.writeHead(403);
       response.end();
       return;
@@ -58,7 +54,7 @@ const server = http.createServer(async (request, response) => {
       throw error;
     }
 
-    if (!isWithinRoot(realPath)) {
+    if (realPath !== repositoryRoot && !realPath.startsWith(repositoryRoot + path.sep)) {
       response.writeHead(403);
       response.end();
       return;
