@@ -1,53 +1,36 @@
 # My1040NR
 
-Free U.S. tax form preparation for international students and scholars. Live at [my1040nr.com](https://my1040nr.com).
+My1040NR is a free, open-source static website with browser-based preparation flows for tax-year 2025 Forms 8843 and 1040-NR. It generates PDFs for the user to review, print, sign, and mail; it does not transmit a return to the IRS.
 
-Every nonresident student or scholar in the United States must file at least Form 8843 every year, even with no income. The established products charge students for this (one well-known service charges $19.95 for Form 8843 alone and about $55 for a federal return). My1040NR is free, forever, and open source.
+## Privacy model
 
-## The privacy model is the product
+The site is a static, client-side application. Interview answers and uploaded documents are processed in the browser and are not collected or persisted by this project. There are no accounts or application data stores. Reloading or closing the tab clears the in-memory interview. Uploaded documents are parsed locally; extracted values remain candidates until the user reviews and confirms them.
 
-- **Processed on the student's device, never sent to anyone.** When a student opens a document (a W-2, a 1042-S), the app reads it locally on their machine. Documents and answers are never transmitted to us, and there is no server storing returns.
-- **No accounts, no saving.** One session. Closing the tab erases everything.
-- **The SSN is asked last**, on one screen, right before the PDF is generated, and it is never transmitted or stored.
-- **The product is a PDF, not a filing.** The student downloads a ready-to-mail package (a mailing slip first, then the official IRS form, filled in), signs it, and mails it themselves. My1040NR transmits nothing to the IRS.
-- **Plain English.** The app never asks a student "were you exempt?" It derives residency and day counts from questions students can actually answer.
+## Current implementation
 
-## What works today
+- `prepare.html`, `app.js`, and `app-core.js` implement the Form 8843 interview and PDF package.
+- `nr.html`, `nr.js`, `doc-extract.js`, and `app-core.js` implement the Form 1040-NR interview, local document extraction, calculation helpers, and PDF package.
+- State preparation currently supports one W-2 state row and the state paths represented in the engine. It does not model state residency, part-year residency, mid-year moves, or multiple state rows.
 
-- Form 8843 (2025) preparation at [my1040nr.com/prepare](https://my1040nr.com/prepare), producing a 4-page PDF: mailing slip, next steps, and the filled official IRS form.
-- Plain-English explainers and checkers on the site: residency (Substantial Presence Test), the word "exempt" explained, state tax determination, forms guide, and extension rules.
-
-## Architecture
-
-All tax logic lives in one engine (`app-core.js`): interview flow data, field mapping to the official IRS PDFs, and PDF assembly (mailing slips plus filled forms). The web app at my1040nr.com is the shell: it runs entirely in the student's browser, with no server-side processing and nothing stored.
-
-Tax rules are versioned per tax year, and every PDF prints the rules version that produced it, so any return can be traced to the exact rules behind it.
+The code and tests describe implemented behavior, not tax-professional approval or proof that tax calculations and legal interpretations are correct. Tax-year 2025 rules, state outcomes, treaty treatment, form mappings, and mailing details still require authoritative source verification and professional review. See [Readiness](docs/READINESS.md), [Engine and rule sources](docs/ENGINE.md), and [Testing](docs/TESTING.md). Do not treat a passing regression test as verification of tax law.
 
 ## Repository layout
 
-- Root: the static website (also the web shell), plain HTML/CSS/JS with no build step.
-- `app-core.js`: the engine (Form 8843 field map, mailing slip and package builder).
-- `app.js`, `prepare.html`: the web shell interview.
-- `assets/`: the official IRS Form 8843 PDF (public domain, from irs.gov) and pdf-lib (MIT licensed, see below).
-- `docs/PRODUCT-SPEC.md`: the full product specification and the reasoning behind it.
-- `docs/READINESS.md`: an honest checklist of what is built, verified, and still owed.
-
-## Roadmap
-
-1. Form 1040-NR engine (income, treaty benefits, state determination and preparation) with Form 4868 extension support.
-2. More income types (Schedule NEC) and more states.
-3. Golden test coverage for the calculation and determination logic.
+- Root HTML, CSS, and JavaScript files: the static site and browser shells.
+- `app-core.js`: shared Form 8843 and Form 1040-NR calculation, mapping, and PDF helpers.
+- `doc-extract.js`: local W-2 and 1042-S PDF extraction used by the 1040-NR shell.
+- `assets/`: PDF form templates and browser-side PDF libraries.
+- `tests/`: Node unit tests, Playwright browser tests, and fictional fixtures.
+- `docs/PRODUCT-SPEC.md`: product requirements and implementation notes; it is not an authoritative tax-law source.
 
 ## Contributing
 
-Issues and pull requests are welcome, especially: verification of rules data against current IRS and state instructions (see the TODO_VERIFY notes in the spec), translations of the plain-English guidance, and test cases. Please do not submit any real taxpayer data anywhere in this project, ever. Test data must be fictional.
+See [Testing](docs/TESTING.md) for setup, test commands, and fixture requirements. All test data must be fictional. Never submit real taxpayer information in source, issues, pull requests, filenames, logs, or test artifacts. Tax-rule changes need authoritative, tax-year-specific source citations and clear verification status; do not promote `TODO_VERIFY` expectations based on inference.
 
 ## Disclaimer
 
-My1040NR is software and general information, not tax, legal, or immigration advice, and it is not affiliated with the IRS. Tax rules in this repository are provided for education and preparation assistance; verify anything that matters against the official IRS and state instructions for the relevant tax year.
+My1040NR is software and general information, not tax, legal, or immigration advice, and is not affiliated with the IRS. The project does not certify that generated results are complete or correct. Consult official IRS and state instructions and a qualified tax professional for advice about an individual situation.
 
 ## License
 
-MIT. See `LICENSE`.
-
-Third-party components: pdf-lib (MIT License, (c) pdf-lib contributors), vendored in `assets/`. IRS forms are works of the U.S. federal government and are in the public domain.
+MIT. See `LICENSE`. Third-party components and form assets are documented in the repository.
