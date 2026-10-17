@@ -9,10 +9,10 @@
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="logo">My<span>1040NR</span></div>
-    <nav>
-      <a href="index.html">Home</a>
+  <header class="site-header">
+    <a class="logo" href="index.html" aria-label="My1040NR home">My<span>1040NR</span></a>
+    <nav aria-label="Main navigation">
+      <a href="residency.html">Residency checker</a>
       <a href="exempt.html">What is "exempt"?</a>
       <a href="forms.html">Forms guide</a>
       <a href="vita.html">In-person help</a>
@@ -21,44 +21,62 @@
     </nav>
   </header>
 
+  <main class="page-main public-page public-page--checker checker-page">
   <section>
-    <h1 style="font-size:36px">Am I a resident for tax purposes?</h1>
-    <p class="body" style="margin-top:12px">We will not ask you if you were "exempt", because almost nobody knows. Instead, tell us your visa and when you first came. We count your years for you, work out which of your days count, and show you the answer with the numbers. New to the word exempt? Read <a href="exempt.html">the plain English explanation</a> first, it takes two minutes.</p>
+    <h1>Am I a resident for tax purposes?</h1>
+    <p class="body">We will not ask you if you were "exempt", because almost nobody knows. Instead, tell us your visa and when you first came. We count your years for you, work out which of your days count, and show you the answer with the numbers. New to the word exempt? Read <a href="exempt.html">the plain English explanation</a> first, it takes two minutes.</p>
 
-    <label for="citizen">Are you a US citizen or a green card holder?</label>
-    <select id="citizen"><option value="no">No</option><option value="yes">Yes</option></select>
+    <div class="checker-fields">
+      <div class="checker-field">
+        <label for="citizen">Are you a US citizen or a green card holder?</label>
+        <select id="citizen"><option value="no">No</option><option value="yes">Yes</option></select>
+      </div>
 
-    <label for="visa">Your visa type</label>
-    <select id="visa">
-      <option value="F-student">F-1 student (or F-2 family)</option>
-      <option value="J-student">J-1 student (or J-2 family)</option>
-      <option value="J-scholar">J-1 teacher, researcher or trainee</option>
-      <option value="other">Other visa, or no visa</option>
-    </select>
+      <div class="checker-field">
+        <label for="visa">Your visa type</label>
+        <select id="visa">
+          <option value="F-student">F-1 student (or F-2 family)</option>
+          <option value="J-student">J-1 student (or J-2 family)</option>
+          <option value="J-scholar">J-1 teacher, researcher or trainee</option>
+          <option value="other">Other visa, or no visa</option>
+        </select>
+      </div>
 
-    <label for="firstYear">What was the first calendar year you were in the US on an F or J visa, even for one day?</label>
-    <p class="small">Look at your first I-20 or DS-2019 start date, or your oldest US entry stamp. Example: you arrived in August 2023, so your first year is 2023.</p>
-    <input id="firstYear" type="number" min="1990" max="2025" value="2023">
+      <div class="checker-field checker-field--wide">
+        <label for="firstYear">What was the first calendar year you were in the US on an F or J visa, even for one day?</label>
+        <p class="small checker-help" id="firstYear-help">Look at your first I-20 or DS-2019 start date, or your oldest US entry stamp. Example: you arrived in August 2023, so your first year is 2023.</p>
+        <input id="firstYear" aria-describedby="firstYear-help" type="number" min="1990" max="2025" value="2023">
+      </div>
 
-    <label for="priorYears">Before that first year, how many earlier calendar years had you already spent in the US on any F or J visa?</label>
-    <p class="small">Most students: 0. Count these only if you had an earlier US stay on F or J, for example a bachelor's before a master's, in years before the first year above.</p>
-    <input id="priorYears" type="number" min="0" max="20" value="0">
+      <div class="checker-field checker-field--wide">
+        <label for="priorYears">Before that first year, how many earlier calendar years had you already spent in the US on any F or J visa?</label>
+        <p class="small checker-help" id="priorYears-help">Most students: 0. Count these only if you had an earlier US stay on F or J, for example a bachelor's before a master's, in years before the first year above.</p>
+        <input id="priorYears" aria-describedby="priorYears-help" type="number" min="0" max="20" value="0">
+      </div>
 
-    <label for="d2025">Days physically in the US in 2025</label>
-    <input id="d2025" type="number" min="0" max="366" value="200">
-    <label for="d2024">Days physically in the US in 2024</label>
-    <input id="d2024" type="number" min="0" max="366" value="200">
-    <label for="d2023">Days physically in the US in 2023</label>
-    <input id="d2023" type="number" min="0" max="366" value="100">
-    <p class="small">Not sure of your days? Your I-94 travel history at i94.cbp.dhs.gov lists every entry and exit.</p>
+      <div class="checker-field">
+        <label for="d2025">Days physically in the US in 2025</label>
+        <input id="d2025" aria-describedby="day-count-help" type="number" min="0" max="366" value="200">
+      </div>
+      <div class="checker-field">
+        <label for="d2024">Days physically in the US in 2024</label>
+        <input id="d2024" aria-describedby="day-count-help" type="number" min="0" max="366" value="200">
+      </div>
+      <div class="checker-field">
+        <label for="d2023">Days physically in the US in 2023</label>
+        <input id="d2023" aria-describedby="day-count-help" type="number" min="0" max="366" value="100">
+      </div>
+      <p class="small checker-help checker-field--wide" id="day-count-help">Not sure of your days? Your I-94 travel history at i94.cbp.dhs.gov lists every entry and exit.</p>
+    </div>
 
-    <p style="margin-top:20px"><button class="btn" onclick="runCheck()">Count my years and check</button></p>
+    <div class="checker-actions"><button class="btn" onclick="runCheck()">Count my years and check</button></div>
 
-    <div class="result" id="result"></div>
-    <p class="small" style="margin-top:14px">Simplified checker for guidance only. It does not handle days you could not leave because of a medical condition, the closer connection exception (Form 8840), dual-status years, or treaty tie-breakers. The full My1040NR interview handles all of those.</p>
+    <div class="result checker-result" id="result" role="status" aria-live="polite" aria-atomic="true"></div>
+    <p class="small checker-caveat">Simplified checker for guidance only. It does not handle days you could not leave because of a medical condition, the closer connection exception (Form 8840), dual-status years, or treaty tie-breakers. The full My1040NR interview handles all of those.</p>
   </section>
 
     <p class="small" style="margin-top:26px"><a href="legal.html">Disclaimer, terms and privacy</a> | Not tax advice. Not affiliated with the IRS.</p>
+  </main>
   <footer>My1040NR. Residency first, then the right form.</footer>
 </div>
 <script>

@@ -9,10 +9,9 @@
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="logo">My<span>1040NR</span></div>
-    <nav>
-      <a href="index.html">Home</a>
+  <header class="site-header">
+    <a class="logo" href="index.html" aria-label="My1040NR home">My<span>1040NR</span></a>
+    <nav aria-label="Main navigation">
       <a href="residency.html">Residency checker</a>
       <a href="exempt.html">What is "exempt"?</a>
       <a href="forms.html">Forms guide</a>
@@ -22,8 +21,9 @@
     </nav>
   </header>
 
+  <main class="page-main public-page public-page--legal">
   <section>
-    <h1 style="font-size:34px">Disclaimer, terms and privacy</h1>
+    <h1>Disclaimer, terms and privacy</h1>
     <p class="small">Last updated: October 14, 2026. These pages are a starting framework for a product in development. They will be reviewed by a qualified attorney before the service accepts any real tax return.</p>
   <p class="body" style="margin-top:12px">Questions about this site: <a href="mailto:support@my1040nr.com">support@my1040nr.com</a>. Please never email Social Security numbers or tax documents to us: the service is designed so you never need to.</p>
   </section>
@@ -62,6 +62,7 @@
     </ul>
   </section>
 
+  </main>
   <footer>My1040NR. Educational information and tax preparation software, not tax advice. Not affiliated with the IRS.</footer>
 </div>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "d125a6158dc6462fb92596a2585a46fb"}'></script><!-- End Cloudflare Web Analytics -->
