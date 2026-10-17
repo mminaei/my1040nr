@@ -115,7 +115,12 @@ test('Form 8843 progress indicator advances with interview steps', async ({ page
 
   await page.getByRole('button', { name: 'Continue' }).click();
 
-  expect((await progressFill.boundingBox()).width).toBeGreaterThan(0);
+  // The fill animates via a 0.2s CSS width transition, so poll until it settles
+  // instead of measuring once mid-transition (flaky on loaded CI runners).
+  await expect.poll(async () => {
+    const box = await progressFill.boundingBox();
+    return box ? box.width : 0;
+  }).toBeGreaterThan(0);
 });
 
 test('Form 8843 download has the expected filename, page order, and selected output', async ({ page }) => {
