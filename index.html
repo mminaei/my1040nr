@@ -11,11 +11,11 @@
 <meta property="og:type" content="website">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"My1040NR","url":"https://my1040nr.com/","description":"US tax return preparation for international students and scholars on F, J, M and Q visas."}</script>
 </head>
-<body>
-<div class="wrap">
-  <header>
-    <div class="logo">My<span>1040NR</span></div>
-    <nav>
+<body class="home-page">
+<div class="wrap home-wrap">
+  <header class="site-header home-header">
+    <a class="home-brand" href="index.html" aria-label="My1040NR home">My<span>1040NR</span></a>
+    <nav class="home-nav" aria-label="Main navigation">
       <a href="residency.html">Residency checker</a>
       <a href="exempt.html">What is "exempt"?</a>
       <a href="forms.html">Forms guide</a>
@@ -25,20 +25,26 @@
     </nav>
   </header>
 
-  <div class="hero">
-    <h1>US taxes, built <em>only</em> for international students.</h1>
-    <p class="sub">If you study or do research in the US on an F, J, M or Q visa, regular tax software was not built for you. It will happily file the wrong form for you. My1040NR starts with your visa, your days in the US, and your treaty, then builds the return you actually owe the IRS: Form 1040-NR, Form 8843, or both. And it is completely free.</p>
-    <div class="cta">
-      <p><strong>Launching for the 2026 filing season (tax year 2025).</strong> Both preparers are live now: Form 8843 and Form 1040-NR, with California, New York, Massachusetts and Illinois state returns built in. The service is completely free.</p>
-      <p style="margin-top:14px"><a class="btn" href="prepare.html">Prepare Form 8843 free now</a> <a class="btn" href="nr.html">Prepare Form 1040-NR free now</a></p>
-      <!-- TODO-FOUNDER: replace with the real Buttondown embed URL for my1040nr.com -->
-      <form class="inline" action="https://buttondown.com/api/emails/embed-subscribe/TODO-FOUNDER" method="post">
-        <input type="email" name="email" required placeholder="you@university.edu" aria-label="Email address">
-        <button class="btn" type="submit">Join the waitlist</button>
-      </form>
-      <p class="small" style="margin-top:10px">Free to check your residency status today: <a href="residency.html">run the residency checker</a>. No account, no SSN needed.</p>
-    </div>
-  </div>
+  <main class="home-main" id="main-content">
+    <section class="hero home-hero" aria-labelledby="home-title">
+      <div class="home-hero__copy">
+        <h1 id="home-title">US taxes, built <em>only</em> for international students.</h1>
+        <p class="sub">If you study or do research in the US on an F, J, M or Q visa, regular tax software was not built for you. It will happily file the wrong form for you. My1040NR starts with your visa, your days in the US, and your treaty, then builds the return you actually owe the IRS: Form 1040-NR, Form 8843, or both. And it is completely free.</p>
+      </div>
+      <div class="cta home-hero__panel">
+        <p class="home-launch-note"><strong>Launching for the 2026 filing season (tax year 2025).</strong> Both preparers are live now: Form 8843 and Form 1040-NR, with California, New York, Massachusetts and Illinois state returns built in. The service is completely free.</p>
+        <div class="home-actions">
+          <a class="btn" href="prepare.html">Prepare Form 8843 free now</a>
+          <a class="btn secondary" href="nr.html">Prepare Form 1040-NR free now</a>
+        </div>
+        <!-- TODO-FOUNDER: replace with the real Buttondown embed URL for my1040nr.com -->
+        <form class="inline" action="https://buttondown.com/api/emails/embed-subscribe/TODO-FOUNDER" method="post">
+          <input type="email" name="email" required placeholder="you@university.edu" aria-label="Email address">
+          <button class="btn" type="submit">Join the waitlist</button>
+        </form>
+        <p class="small home-checker-link">Free to check your residency status today: <a href="residency.html">run the residency checker</a>. No account, no SSN needed.</p>
+      </div>
+    </section>
 
   <section>
     <h2>The problem we fix</h2>
@@ -76,8 +82,9 @@
 
   <section>
     <h2>Built for your exact situation</h2>
+    <div class="home-table-wrap" role="region" aria-label="Tax situations and what My1040NR does" tabindex="0">
     <table>
-      <tr><th>Your situation</th><th>What My1040NR does</th></tr>
+      <tr><th scope="col">Your situation</th><th scope="col">What My1040NR does</th></tr>
       <tr><td>No income at all</td><td>Free Form 8843, filled and ready to mail, with the correct IRS address for a standalone 8843.</td></tr>
       <tr><td>On-campus job or assistantship</td><td>W-2 plus 1042-S, treaty exemption applied, taxable scholarship split from tax-free tuition amounts.</td></tr>
       <tr><td>OPT, CPT or STEM OPT job</td><td>Employer wages, FICA exemption check, and an estimated tax warning if withholding looks too low.</td></tr>
@@ -86,6 +93,7 @@
       <tr><td>Married, or spouse also on a visa</td><td>The filing status rules for nonresidents, the joint filing bar, and the election that can change it, shown with dollar amounts before you choose.</td></tr>
     <tr><td>State tax question</td><td>We check every state you lived or earned in with that state's own rules, which can differ from the federal answer. If a state return is due, we prepare it into the same PDF with its own mailing slip, because it mails to the state in a separate envelope. <a href="states.html">Check your state now</a>.</td></tr>
     </table>
+    </div>
   </section>
 
   <section>
@@ -107,10 +115,14 @@
     <div class="note">My1040NR is tax preparation software, not a tax advisor. For complex cases (dual-status years, treaty clawbacks, prior years filed on the wrong form), we flag the issue and recommend a qualified tax professional who works with nonresident aliens.</div>
   </section>
 
-  <p style="margin-top:14px"><a class="btn" href="prepare.html">Prepare Form 8843 free now</a> <a class="btn" href="nr.html">Prepare Form 1040-NR free now</a></p>
+    <div class="home-actions home-bottom-actions">
+      <a class="btn" href="prepare.html">Prepare Form 8843 free now</a>
+      <a class="btn secondary" href="nr.html">Prepare Form 1040-NR free now</a>
+    </div>
 
-  <p class="small" style="margin-top:26px"><a href="legal.html">Disclaimer, terms and privacy</a> | Not tax advice. Not affiliated with the IRS.</p>
-  <p class="small" style="margin-top:18px">Open source: <a href="https://github.com/mminaei/my1040nr">github.com/mminaei/my1040nr</a></p>
+    <p class="small home-legal-link"><a href="legal.html">Disclaimer, terms and privacy</a> | Not tax advice. Not affiliated with the IRS.</p>
+    <p class="small home-source-link">Open source: <a href="https://github.com/mminaei/my1040nr">github.com/mminaei/my1040nr</a></p>
+  </main>
   <footer>
     My1040NR. US tax returns for international students and scholars only. F, J, M and Q visas, Form 1040-NR, Form 8843, treaties, and FICA refunds.
   </footer>

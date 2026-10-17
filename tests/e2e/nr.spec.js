@@ -168,6 +168,30 @@ test('synthetic W-2 candidates require confirmation and no-state-row acknowledge
     buffer: Buffer.from(syntheticW2Bytes)
   });
   await expect(page.getByRole('heading', { name: 'Step 3 of 6: check the numbers we read' })).toBeVisible();
+  const desktopReview = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth,
+    columns: getComputedStyle(document.querySelector('.review-grid')).gridTemplateColumns
+  }));
+  expect(desktopReview.document).toBeLessThanOrEqual(desktopReview.viewport);
+  expect(desktopReview.columns.trim().split(/\s+/)).toHaveLength(2);
+  await page.setViewportSize({ width: 375, height: 812 });
+  const mobileReview = await page.evaluate(() => {
+    const selectors = ['.review-grid', '.doc-chips', '.review-fields', '.canvas-wrap', '.rv-field', '.upload-panel'];
+    return {
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+      panels: selectors.map(selector => {
+        const element = document.querySelector(selector);
+        const bounds = element.getBoundingClientRect();
+        return { selector, left: bounds.left, right: bounds.right, width: element.clientWidth, scrollWidth: element.scrollWidth };
+      })
+    };
+  });
+  expect(mobileReview.document).toBeLessThanOrEqual(mobileReview.viewport);
+  expect(mobileReview.panels.every(panel =>
+    panel.left >= 0 && panel.right <= mobileReview.viewport && panel.scrollWidth <= panel.width
+  )).toBe(true);
   const candidateValues = [
     ['Box 1: wages, tips, other compensation', '12000'],
     ['Box 2: federal income tax withheld', '1200'],

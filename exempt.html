@@ -9,11 +9,11 @@
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="logo">My<span>1040NR</span></div>
-    <nav>
-      <a href="index.html">Home</a>
+  <header class="site-header">
+    <a class="logo" href="index.html" aria-label="My1040NR home">My<span>1040NR</span></a>
+    <nav aria-label="Main navigation">
       <a href="residency.html">Residency checker</a>
+      <a href="exempt.html">What is "exempt"?</a>
       <a href="forms.html">Forms guide</a>
       <a href="vita.html">In-person help</a>
       <a href="states.html">State tax?</a>
@@ -21,8 +21,9 @@
     </nav>
   </header>
 
+  <main class="page-main public-page public-page--exempt">
   <section>
-    <h1 style="font-size:36px">The word "exempt", in plain English</h1>
+    <h1>The word "exempt", in plain English</h1>
     <p class="body" style="margin-top:12px">Tax software keeps asking students: "Were you an exempt individual?" Almost nobody knows what that means. Here it is, without the jargon.</p>
   </section>
 
@@ -41,12 +42,14 @@
   <section>
     <h2>How to check if your days counted</h2>
     <p class="body">You only need three facts. You can find all of them on your I-20 or DS-2019 and your I-94 travel history at i94.cbp.dhs.gov.</p>
+    <div class="table-wrap" role="region" aria-label="Exempt status steps and actions" tabindex="0">
     <table>
-      <tr><th>Step</th><th>What to do</th></tr>
+      <tr><th scope="col">Step</th><th scope="col">What to do</th></tr>
       <tr><td>1. Find your first year</td><td>What was the first calendar year you were in the US on an F or J visa, even for one day? A calendar year counts whole, even if you arrived on December 30.</td></tr>
       <tr><td>2. Count your years</td><td>Count from that first year to today, one per calendar year, including years on any earlier F or J stay (a master's after a bachelor's, a second program, a J stay before an F stay, all of it goes in the same count for students).</td></tr>
       <tr><td>3. Compare with your limit</td><td>F-1 and J-1 <strong>students</strong>: your days do not count for your first <strong>5</strong> calendar years. J-1 <strong>teachers, researchers and trainees</strong>: your days do not count for <strong>2</strong> calendar years out of the last 6.</td></tr>
     </table>
+    </div>
     <p class="body" style="margin-top:12px">If you are inside your limit this year, your days do not count this year, and you are a nonresident for tax purposes. If you are past your limit, your days start counting, and the 3 year day test decides.</p>
   </section>
 
@@ -60,6 +63,7 @@
     <p class="small" style="margin-top:10px">Our checker never asks you if you were "exempt". It asks for your visa and your first year, counts your years the way this page does, and shows you the result with the numbers.</p>
   </section>
 
+  </main>
   <footer>My1040NR. Plain English first, IRS words second.</footer>
 </div>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "d125a6158dc6462fb92596a2585a46fb"}'></script><!-- End Cloudflare Web Analytics -->
