@@ -85,6 +85,12 @@ async function completeNoIncomeInterview(page) {
 test('Form 8843 interview preserves order and restarts after reload', async ({ page }) => {
   await page.goto('/prepare.html');
   await expect(page.getByRole('heading', { name: 'Before we start: two quick checks' })).toBeVisible();
+  const desktopWidth = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth
+  }));
+  expect(desktopWidth.document).toBeLessThanOrEqual(desktopWidth.viewport);
+  await page.setViewportSize({ width: 375, height: 812 });
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Your name' })).toBeVisible();
   await page.getByLabel('First name and middle initial (as on your passport)').fill('Jordan Example');
@@ -96,6 +102,25 @@ test('Form 8843 interview preserves order and restarts after reload', async ({ p
   await expect(page.getByLabel('First name and middle initial (as on your passport)')).toHaveCount(0);
   await expectIdentifierNotAsked(page);
   await completeNoIncomeInterview(page);
+  const mobileWidth = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth
+  }));
+  expect(mobileWidth.document).toBeLessThanOrEqual(mobileWidth.viewport);
+});
+
+test('Form 8843 progress indicator advances with interview steps', async ({ page }) => {
+  await page.goto('/prepare.html');
+  const progressFill = page.locator('#bar');
+
+  await page.getByRole('button', { name: 'Continue' }).click();
+
+  // The fill animates via a 0.2s CSS width transition, so poll until it settles
+  // instead of measuring once mid-transition (flaky on loaded CI runners).
+  await expect.poll(async () => {
+    const box = await progressFill.boundingBox();
+    return box ? box.width : 0;
+  }).toBeGreaterThan(0);
 });
 
 test('Form 8843 download has the expected filename, page order, and selected output', async ({ page }) => {
