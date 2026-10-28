@@ -98,3 +98,16 @@ test('all routes fit a 375px viewport without page-level horizontal overflow', a
     expect(widths.document, route).toBeLessThanOrEqual(widths.viewport);
   }
 });
+
+test('every route declares its canonical my1040nr.com URL and the dead waitlist form is gone', async ({ page }) => {
+  for (const route of routes) {
+    await page.goto(route);
+    const canonical = page.locator('link[rel="canonical"]');
+    await expect(canonical).toHaveCount(1);
+    const href = await canonical.getAttribute('href');
+    expect(href.startsWith('https://my1040nr.com')).toBe(true);
+  }
+  await page.goto('/index.html');
+  await expect(page.getByText('Join the waitlist')).toHaveCount(0);
+  await expect(page.locator('form[action*="buttondown"]')).toHaveCount(0);
+});
