@@ -25,7 +25,7 @@ The checked-in PDFs in `assets/` are form templates and do not, by themselves, v
 ## Product and operational items
 
 - The app is designed as a static, client-side site with no collection or persistence of taxpayer data. Keep all test inputs fictional; never put taxpayer information in the repository, test output, or artifacts.
-- The waitlist still points at a `TODO-FOUNDER` Buttondown placeholder; it is not currently an email collection feature.
+- The pre-launch waitlist form was removed in October 2026: it pointed at a placeholder address and collected nothing, and the live product has no email collection.
 - Trademark review, a domain support email, and the founder's business, insurance, and written security-policy decisions remain pending.
 
 ## Release posture

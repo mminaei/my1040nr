@@ -4,7 +4,7 @@
   'use strict';
   var app = document.getElementById('app');
   var d = {
-    visaNow: 'F-1', days: { 2023: '', 2024: '', 2025: '' }, fjYears: '1', greenCard: 'no',
+    taxYear: TAX_YEAR, visaNow: 'F-1', days: { [TAX_YEAR - 2]: '', [TAX_YEAR - 1]: '', [TAX_YEAR]: '' }, fjYears: '1', greenCard: 'no',
     firstName: '', middleInitial: '', lastName: '', status: 'single', digitalAssets: 'no',
     addrWhere: 'us', addrUS: {}, addrAbroad: {},
     wagesW2: '', fedWithheldW2: '', ssTaxW2: '', medTaxW2: '',
@@ -86,16 +86,19 @@
   function money(n) { return '$' + Math.round(n).toLocaleString('en-US'); }
   var US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 
+  function Y() { return parseInt(d.taxYear, 10) || TAX_YEAR; }
+  function R() { return rulesFor(d.taxYear); }
+
   function next() {
     if (step === 0) step = 1;
     else if (step === 1) {
-      residency = residency2025({
-        visaNow: d.visaNow, greenCard: d.greenCard === 'yes',
-        days: { 2023: num(d.days[2023]), 2024: num(d.days[2024]), 2025: num(d.days[2025]) },
-        fjYearsThrough2025: parseInt(d.fjYears, 10) || 0
-      });
+      var ry = Y();
+      var rdays = {}; rdays[ry] = num(d.days[ry]); rdays[ry - 1] = num(d.days[ry - 1]); rdays[ry - 2] = num(d.days[ry - 2]);
+      var rinput = { visaNow: d.visaNow, greenCard: d.greenCard === 'yes', days: rdays, taxYear: d.taxYear };
+      rinput['fjYearsThrough' + ry] = parseInt(d.fjYears, 10) || 0;
+      residency = residencyForYear(rinput);
       if (residency.resident) {
-        message('You file a different form for 2025',
+        message('You file a different form for ' + Y(),
           '<p>' + residency.why + '</p><p>Resident aliens file Form 1040, not Form 1040-NR, and this preparer stops here on purpose. Free options for residents include IRS Free File and FreeTaxUSA. If you also had F or J days in earlier years, talk to your campus tax advisor before filing, because dual-status years are tricky.</p>',
           null, null);
         return;
@@ -113,7 +116,7 @@
     else if (step === 3) {
       if (num(d.wagesW2) + num(d.wages1042) + num(d.scholarshipTaxable) <= 0) {
         message('No income to report?',
-          '<p>You entered no wages and no taxable scholarship. If you truly had no US income in 2025, you most likely only need <a href="prepare.html">Form 8843</a>, not a 1040-NR. If you did have income, go back and copy the numbers from your W-2 or 1042-S.</p>',
+          '<p>You entered no wages and no taxable scholarship. If you truly had no US income in ' + Y() + ', you most likely only need <a href="prepare.html">Form 8843</a>, not a 1040-NR. If you did have income, go back and copy the numbers from your W-2 or 1042-S.</p>',
           'Back to documents', function () { step = 3; render(); });
         return;
       }
@@ -241,7 +244,7 @@
     reviewing = false;
     if (num(d.wagesW2) + num(d.wages1042) + num(d.scholarshipTaxable) <= 0) {
       message('No income to report?',
-        '<p>You confirmed no wages and no taxable scholarship. If you truly had no US income in 2025, you most likely only need <a href="prepare.html">Form 8843</a>, not a 1040-NR. If you did have income, go back and check the numbers on your documents.</p>',
+        '<p>You confirmed no wages and no taxable scholarship. If you truly had no US income in ' + Y() + ', you most likely only need <a href="prepare.html">Form 8843</a>, not a 1040-NR. If you did have income, go back and check the numbers on your documents.</p>',
         'Back to documents', function () { step = 3; render(); });
       return;
     }
@@ -407,23 +410,25 @@
   function render() {
     if (step === 0) {
       shell('Before you start', '' +
-        '<p>This preparer covers the most common student situation for 2025:</p>' +
+        sel('Tax year', 'taxYear', String(d.taxYear), availableYears().map(function (y) { return [String(y), String(y)]; })) +
+        '<p class="small">New tax years appear here as the IRS publishes their final forms.</p>' +
+        '<p>This preparer covers the most common student situation for ' + Y() + ':</p>' +
         '<ul><li>You are a nonresident alien (we check this together in the next step).</li>' +
         '<li>Your US income is wages on a W-2 and/or a 1042-S, and/or a taxable scholarship or fellowship.</li>' +
         '<li>You file as single, or married filing separately, with no dependents.</li></ul>' +
         '<p>It does not cover investment income (dividends, capital gains), self-employment, or rental income. If those apply, use a preparer that supports Schedule NEC or talk to a tax professional.</p>' +
-        '<p class="note">Deadline for this return: <strong>April 15, 2026</strong>. Need more time? Form 4868 extends the filing deadline to October 15, 2026 (it never extends the deadline to pay). No account, nothing saved: if you close this tab, everything is gone.</p>',
+        '<p class="note">Deadline for this return: <strong>' + R().deadlines.federal + '</strong>. Need more time? Form 4868 extends the filing deadline to ' + R().deadlines.extensionTo + ' (it never extends the deadline to pay). No account, nothing saved: if you close this tab, everything is gone.</p>',
         false);
     }
     if (step === 1) {
-      shell('Step 1 of 6: your residency for 2025',
+      shell('Step 1 of 6: your residency for ' + Y(),
         '<p class="note">' + 'We never ask if you were "exempt". We work it out from your visa and your years, the way the IRS rules do.' + '</p>' +
-        sel('Your visa type on December 31, 2025', 'visaNow', d.visaNow, [['F-1', 'F-1 student'], ['F-2', 'F-2'], ['J-1', 'J-1 exchange visitor'], ['J-2', 'J-2'], ['other', 'Something else']]) +
+        sel('Your visa type on December 31, ' + Y(), 'visaNow', d.visaNow, [['F-1', 'F-1 student'], ['F-2', 'F-2'], ['J-1', 'J-1 exchange visitor'], ['J-2', 'J-2'], ['other', 'Something else']]) +
         sel('Do you have a green card (or one pending that was approved)?', 'greenCard', d.greenCard, [['no', 'No'], ['yes', 'Yes']]) +
-        field('Days you were in the US in 2025', 'days.2025', d.days[2025], { type: 'number', inputmode: 'numeric' }) +
-        field('Days you were in the US in 2024', 'days.2024', d.days[2024], { type: 'number', inputmode: 'numeric' }) +
-        field('Days you were in the US in 2023', 'days.2023', d.days[2023], { type: 'number', inputmode: 'numeric' }) +
-        sel('In how many calendar years, counting 2025, have you held F or J status for any part of the year?', 'fjYears', d.fjYears,
+        field('Days you were in the US in ' + Y(), 'days.' + Y(), d.days[Y()], { type: 'number', inputmode: 'numeric' }) +
+        field('Days you were in the US in ' + (Y() - 1), 'days.' + (Y() - 1), d.days[Y() - 1], { type: 'number', inputmode: 'numeric' }) +
+        field('Days you were in the US in ' + (Y() - 2), 'days.' + (Y() - 2), d.days[Y() - 2], { type: 'number', inputmode: 'numeric' }) +
+        sel('In how many calendar years, counting ' + Y() + ', have you held F or J status for any part of the year?', 'fjYears', d.fjYears,
           [['0', '0 (never F or J)'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5'], ['6', '6 or more']]),
         false);
     }
@@ -433,7 +438,7 @@
         field('First name and middle initial', 'firstName', d.firstName) +
         field('Last name (family name)', 'lastName', d.lastName) +
         sel('Filing status', 'status', d.status, [['single', 'Single'], ['mfs', 'Married filing separately']]) +
-        sel('Did you have any digital assets (crypto and similar) activity in 2025?', 'digitalAssets', d.digitalAssets, [['no', 'No'], ['yes', 'Yes']]) +
+        sel('Did you have any digital assets (crypto and similar) activity in ' + Y() + '?', 'digitalAssets', d.digitalAssets, [['no', 'No'], ['yes', 'Yes']]) +
         sel('Where should the IRS mail you?', 'addrWhere', d.addrWhere, [['us', 'A US address'], ['abroad', 'An address outside the US']]) +
         (us
           ? field('US street address', 'addrUS.street', d.addrUS.street) + field('Apartment (optional)', 'addrUS.apt', d.addrUS.apt) +
@@ -475,8 +480,8 @@
         field('Months you claimed this treaty benefit in earlier years (0 if none)', 'treatyMonthsPrior', d.treatyMonthsPrior, { type: 'number', inputmode: 'numeric' }) +
         sel('Country of citizenship', 'citizenship', d.citizenship, [['', 'Choose a country']].concat(countryOpts())) +
         sel('Country where you claim tax residence', 'taxResidence', d.taxResidence, [['', 'Choose a country']].concat(countryOpts())) +
-        '<label class="field"><span>Your trips in and out of the US during 2025, one per line: entry date, exit date (MM/DD/YYYY). Leave blank if you never left.</span>' +
-        '<textarea name="tripsText" rows="4" placeholder="01/04/2025, 12/18/2025">' + String(d.tripsText || '').replace(/</g, '&lt;') + '</textarea></label>' +
+        '<label class="field"><span>Your trips in and out of the US during ' + Y() + ', one per line: entry date, exit date (MM/DD/YYYY). Leave blank if you never left.</span>' +
+        '<textarea name="tripsText" rows="4" placeholder="01/04/' + Y() + ', 12/18/' + Y() + '">' + String(d.tripsText || '').replace(/</g, '&lt;') + '</textarea></label>' +
         sel('Have you ever applied to become a green card holder?', 'appliedGreenCard', d.appliedGreenCard, [['no', 'No'], ['yes', 'Yes']]) +
         sel('Have you ever held a green card before?', 'everGreenCard', d.everGreenCard, [['no', 'No'], ['yes', 'Yes']]) +
         sel('Did you change visa type or immigration status at any point?', 'changedStatus', d.changedStatus, [['no', 'No'], ['yes', 'Yes']]) +
@@ -502,7 +507,7 @@
           : '<p class="verdict">No refund and nothing owed. You still have to file.</p>');
       var fica = calc.ficaFlag
         ? '<p class="note"><strong>Possible extra refund:</strong> your W-2 shows ' + money(calc.ficaWithheld) + ' of Social Security and Medicare tax. Most F-1 and J-1 nonresident students do not owe those taxes. First ask your employer to refund them. If the employer will not, you can claim them from the IRS with Form 843 and Form 8316. This return does not claim them, and they are not in the numbers above.</p>' : '';
-      shell('Step 5 of 6: your federal result for 2025',
+      shell('Step 5 of 6: your federal result for ' + Y(),
         '<p class="note">' + residency.why + '</p>' +
         '<table class="lines">' + rows + '</table>' + verdict + fica +
         '<p class="note">Check the numbers against your W-2 and 1042-S before you continue. One step left: your SSN or ITIN, asked only now, used only inside the PDF made on this device.</p>',
@@ -511,7 +516,7 @@
     if (step === 6) {
       var stBody;
       if (det.action === 'prepare') {
-        var sf = STATE_FORMS[det.state];
+        var sf = stateFormFor(d.taxYear, det.state);
         var verdict = stateRes.refund > 0 ? '<p class="verdict good">' + det.state + ' refund: ' + money(stateRes.refund) + '</p>'
           : (stateRes.owed > 0 ? '<p class="verdict bad">' + det.state + ' amount owed: ' + money(stateRes.owed) + '</p>' : '<p class="verdict">' + det.state + ': no refund, nothing owed.</p>');
         stBody = '<p>' + det.reason + '</p>' +
@@ -519,7 +524,7 @@
           '<tr><td>' + det.state + ' tax already withheld</td><td class="num">' + money(stateRes.payments) + '</td></tr></table>' + verdict +
           '<p class="note">The state return goes in its OWN envelope to the state, never to the IRS. Your package includes a separate state mailing slip with the right address (' + sf.agency + ', deadline ' + sf.deadline + ').</p>' +
           (det.state === 'NY' ? sel('Do you have a bank or financial account in another country?', 'nyForeignAcct', d.nyForeignAcct, [['no', 'No'], ['yes', 'Yes']]) +
-            sel('Did you keep an apartment or other living quarters in New York State during 2025?', 'nyLivingQuarters', d.nyLivingQuarters, [['no', 'No'], ['yes', 'Yes']]) +
+            sel('Did you keep an apartment or other living quarters in New York State during ' + Y() + '?', 'nyLivingQuarters', d.nyLivingQuarters, [['no', 'No'], ['yes', 'Yes']]) +
             '<p class="note">If you kept living quarters in New York and spent 183 or more days there, New York may treat you as a resident for tax. If that is you, talk to a tax advisor before filing this nonresident return.</p>' : '');
       } else if (det.action === 'prepare-refund-only') {
         stBody = '<p>' + det.reason + '</p><p class="note">This version prepares CA, NY, MA and IL. For ' + det.state + ', use the worksheet numbers in your summary page with that state\'s own nonresident form to claim the withholding back.</p>';
@@ -543,17 +548,17 @@
       var docs = [];
       docs.push(await buildReturnSlip(PDFLib, d, calc));
       docs.push(await buildSummary(PDFLib, d, calc, residency));
-      var bNR = await (await fetch('assets/f1040nr.pdf')).arrayBuffer();
+      var bNR = await (await fetch(R().forms.f1040nr)).arrayBuffer();
       docs.push(await fill1040NR(PDFLib, bNR, d, calc));
-      var bOI = await (await fetch('assets/f1040nro.pdf')).arrayBuffer();
+      var bOI = await (await fetch(R().forms.schedOI)).arrayBuffer();
       docs.push(await fillScheduleOI(PDFLib, bOI, d, calc));
       if (calc.line8 > 0) {
-        var bS1 = await (await fetch('assets/f1040s1.pdf')).arrayBuffer();
+        var bS1 = await (await fetch(R().forms.sched1)).arrayBuffer();
         docs.push(await fillSchedule1(PDFLib, bS1, d, calc));
       }
       if (det && det.action === 'prepare' && stateRes) {
         docs.push(await buildStateSlip(PDFLib, det.state, d, stateRes));
-        var asset = { CA: 'assets/ca-540nr.pdf', NY: 'assets/ny-it203.pdf', MA: 'assets/ma-1nrpy.pdf', IL: 'assets/il-1040.pdf' }[det.state];
+        var asset = R().states[det.state].asset;
         var bSt = await (await fetch(asset)).arrayBuffer();
         if (det.state === 'CA') docs.push(await fillCA(PDFLib, bSt, d, stateRes));
         if (det.state === 'NY') docs.push(await fillNY(PDFLib, bSt, d, stateRes));
@@ -579,8 +584,8 @@
         (calc.line8 > 0 ? ', plus Schedule 1 for your scholarship' : '') +
         ((det && det.action === 'prepare') ? ', and after those, your ' + det.state + ' state return behind its own mailing slip' : '') + '.</p>' + owedNote +
         ((det && det.action === 'prepare') ? '<p><strong>The state return goes in a separate envelope to the state address on its slip. Never mail it to the IRS.</strong></p>' : '') +
-        '<p><strong>Print it, sign and date page 2 of the 1040-NR, attach Copy B of each W-2 and Copy C of each 1042-S behind the return, and mail it by April 15, 2026.</strong> Keep a copy of everything.</p></div>'));
-      var a = el('<a class="btn" download="my1040nr-1040nr-2025.pdf">Download your PDF</a>');
+        '<p><strong>Print it, sign and date page 2 of the 1040-NR, attach Copy B of each W-2 and Copy C of each 1042-S behind the return, and mail it by ' + R().deadlines.federal + '.</strong> Keep a copy of everything.</p></div>'));
+      var a = el('<a class="btn" download="my1040nr-1040nr-' + Y() + '.pdf">Download your PDF</a>');
       a.href = pdfUrl;
       wrap.appendChild(a);
       var erase = el('<button class="btn secondary" style="margin-left:.5rem">Erase everything now</button>');
@@ -620,16 +625,16 @@
   }
   function buildReturnSlip(PDFLib, d, c) {
     var owed = c.owed > 0;
-    return textPage(PDFLib, 'Mailing slip: Form 1040-NR (2025)', [
+    return textPage(PDFLib, 'Mailing slip: Form 1040-NR (' + Y() + ')', [
       '#FROM',
       d.firstName + ' ' + d.lastName,
       owed ? '' : '',
       '#MAIL THIS PACKAGE TO',
-      owed ? 'Internal Revenue Service, P.O. Box 1303, Charlotte, NC 28201-1303' : 'Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0215',
+      owed ? R().irsAddress.payment.join(', ') : R().irsAddress.noPayment.join(', '),
       owed ? '(Use this address because a payment is enclosed or owed.)' : '(Use this address when no payment is enclosed.)',
       '',
       '#DEADLINE',
-      'Postmark by April 15, 2026. An extension (Form 4868) moves filing to October 15, 2026, never the duty to pay.',
+      'Postmark by ' + R().deadlines.federal + '. An extension (Form 4868) moves filing to ' + R().deadlines.extensionTo + ', never the duty to pay.',
       '',
       '#IN THIS ENVELOPE',
       '1. This slip (not an IRS form, just your guide).',
@@ -637,7 +642,7 @@
       '3. Schedule OI (required with the return).',
       c.line8 > 0 ? '4. Schedule 1 (for your taxable scholarship).' : '',
       '5. Copy B of every W-2 and Copy C of every 1042-S, attached behind the return.',
-      owed ? '6. A check or money order payable to "United States Treasury" with your SSN and "2025 Form 1040-NR" written on it, or pay online and write "paid online" here.' : '',
+      owed ? '6. A check or money order payable to "United States Treasury" with your SSN and "' + Y() + ' Form 1040-NR" written on it, or pay online and write "paid online" here.' : '',
       '',
       '#BEFORE YOU SEAL IT',
       'Sign and date page 2 of Form 1040-NR. An unsigned return is not filed.',
@@ -647,7 +652,7 @@
     ].filter(function (x) { return x !== ''; }));
   }
   function buildStateSlip(PDFLib, st, d, s) {
-    var sf = STATE_FORMS[st];
+    var sf = stateFormFor(d.taxYear, st);
     var owe = s.owed > 0;
     var notes = {
       CA: 'California does not honor the federal treaty exemption: treaty-exempt wages were added back on line 16. Schedule CA (540NR) is not attached in this version; if the FTB asks for it, your California amounts are on the summary worksheet in this package.',
@@ -655,7 +660,7 @@
       MA: 'Massachusetts amounts are entered as Massachusetts source income, the way Form 1-NR/PY asks nonresidents to report. Your exemption was prorated on line 22 using the line 14g ratio. Enclose Schedule HC if it applies to you.',
       IL: 'Schedule NR is not attached in this version. Your Schedule NR numbers are on the summary worksheet in this package; if Illinois asks for the schedule, copy them in.'
     }[st];
-    return textPage(PDFLib, 'State mailing slip: ' + sf.form + ' (' + st + ', 2025)', [
+    return textPage(PDFLib, 'State mailing slip: ' + sf.form + ' (' + st + ', ' + Y() + ')', [
       '#SEPARATE ENVELOPE',
       'This state return goes in its OWN envelope to the state. Never mail it to the IRS, and never mail your federal return to the state.',
       '',
@@ -669,7 +674,7 @@
       '1. This slip (not a state form, just your guide).',
       '2. The filled ' + sf.form + ', signed and dated.',
       '3. A copy of your federal return and your W-2 (states ask for these; include copies, not originals).',
-      owe ? '4. Payment: pay online at the state tax website if you can; otherwise a check payable per the form instructions, with your SSN and "2025 ' + sf.form + '" written on it.' : '',
+      owe ? '4. Payment: pay online at the state tax website if you can; otherwise a check payable per the form instructions, with your SSN and "' + Y() + ' ' + sf.form + '" written on it.' : '',
       '',
       '#YOUR NUMBERS',
       st + ' tax: ' + money(s.tax) + '. Withheld: ' + money(s.payments) + '. ' + (s.refund > 0 ? 'Refund: ' + money(s.refund) + '.' : (s.owed > 0 ? 'You owe: ' + money(s.owed) + '.' : 'Nothing owed, no refund.')),
@@ -679,7 +684,7 @@
     ].filter(function (x) { return x !== ''; }));
   }
   function buildSummary(PDFLib, d, c, res) {
-    return textPage(PDFLib, 'Your 2025 summary (not an IRS form)', [
+    return textPage(PDFLib, 'Your ' + Y() + ' summary (not an IRS form)', [
       '#RESULT',
       c.refund > 0 ? 'Estimated refund: ' + money(c.refund) : (c.owed > 0 ? 'Amount owed: ' + money(c.owed) : 'No refund, nothing owed.'),
       '',

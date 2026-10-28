@@ -30,14 +30,15 @@ function fmtDate(iso) {
   return p[1] + '/' + p[2] + '/' + p[0];
 }
 /* Count calendar years in which the person was a student visa holder for any
-   part of the year, from their first F/J year through 2025, plus any earlier
-   F/J years they reported. Used for Form 8843 line 12 (more than 5 years). */
+   part of the year, from their first F/J year through the tax year, plus any
+   earlier F/J years they reported. Used for Form 8843 line 12 (more than 5). */
 function studentYearCount(d) {
   let years = new Set();
+  const Y = parseInt(d.taxYear, 10) || TAX_YEAR;
   if (d.firstYear) {
-    for (let y = parseInt(d.firstYear, 10); y <= TAX_YEAR; y++) years.add(y);
+    for (let y = parseInt(d.firstYear, 10); y <= Y; y++) years.add(y);
   }
-  ['2019','2020','2021','2022','2023','2024'].forEach(function (y) {
+  [Y - 6, Y - 5, Y - 4, Y - 3, Y - 2, Y - 1].map(String).forEach(function (y) {
     const v = d['visa' + y];
     if (v && v !== 'none') years.add(parseInt(y, 10));
   });
@@ -85,9 +86,10 @@ async function fill8843(PDFLib, formBytes, d) {
   setText(form, FIELD.citizenship, d.citizenship + (d.citizenship2 ? ', ' + d.citizenship2 : ''));
   setText(form, FIELD.passportCountry, d.passportCountry);
   setText(form, FIELD.passportNo, d.passportNo);
-  setText(form, FIELD.days2025, d.days2025);
-  setText(form, FIELD.days2024, d.days2024);
-  setText(form, FIELD.days2023, d.days2023);
+  var fy = rulesFor(d.taxYear).year;
+  setText(form, FIELD.days2025, d['days' + fy]);
+  setText(form, FIELD.days2024, d['days' + (fy - 1)]);
+  setText(form, FIELD.days2023, d['days' + (fy - 2)]);
   setText(form, FIELD.daysExcluded, d.daysExcluded);
   setText(form, FIELD.school, d.school);
   setText(form, FIELD.director, d.director);
@@ -119,6 +121,7 @@ function wrapText(text, max) {
   return lines;
 }
 async function makeFrontPages(PDFLib, d) {
+  const r = rulesFor(d.taxYear);
   const doc = await PDFLib.PDFDocument.create();
   const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
   const bold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
@@ -135,9 +138,9 @@ async function makeFrontPages(PDFLib, d) {
   wrapText((d.firstName + ' ' + d.lastName).toUpperCase() + '\n' + d.addrUS, 60).forEach(function (l) { draw(p, l, M, y, 11); y -= 15; });
   y -= 14;
   draw(p, 'MAIL TO', M, y, 11, bold); y -= 24;
-  draw(p, 'Department of the Treasury', M, y, 17, bold); y -= 21;
-  draw(p, 'Internal Revenue Service', M, y, 17, bold); y -= 21;
-  draw(p, 'Austin, TX 73301-0215', M, y, 17, bold); y -= 20;
+  draw(p, r.irsAddress.noPayment[0], M, y, 17, bold); y -= 21;
+  draw(p, r.irsAddress.noPayment[1], M, y, 17, bold); y -= 21;
+  draw(p, r.irsAddress.noPayment[2], M, y, 17, bold); y -= 20;
   draw(p, 'This is the IRS address printed in the Form 8843 instructions for a', M, y, 10); y -= 14;
   draw(p, 'Form 8843 filed by itself, with no payment enclosed.', M, y, 10); y -= 30;
   draw(p, 'IN THE ENVELOPE', M, y, 11, bold); y -= 17;
@@ -145,18 +148,18 @@ async function makeFrontPages(PDFLib, d) {
   draw(p, 'BEFORE YOU SEAL IT', M, y, 11, bold); y -= 17;
   ['Sign and date Form 8843 on page 2, where it says "Sign here".',
    'Keep a copy or a clear photo of everything you mail.',
-   'Mail it in time: for a Form 8843 filed by itself, the deadline is June 15, 2026.',
-   'If you also had U.S. income in 2025, you must also file Form 1040-NR,',
-   'and that package is due April 15, 2026.'].forEach(function (l) { draw(p, l, M, y, 11); y -= 15; });
+   'Mail it in time: for a Form 8843 filed by itself, the deadline is ' + r.deadlines.form8843 + '.',
+   'If you also had U.S. income in ' + r.year + ', you must also file Form 1040-NR,',
+   'and that package is due ' + r.deadlines.federal + '.'].forEach(function (l) { draw(p, l, M, y, 11); y -= 15; });
   y -= 18;
   draw(p, 'Cut out and tape to your envelope:', M, y, 10); y -= 8;
   const ly = y - 74;
   p.drawRectangle({ x: M, y: ly, width: 340, height: 74, borderWidth: 1, borderColor: PDFLib.rgb(0, 0, 0), borderDashArray: [5, 4] });
-  draw(p, 'Department of the Treasury', M + 12, ly + 54, 11, bold);
-  draw(p, 'Internal Revenue Service', M + 12, ly + 39, 11, bold);
-  draw(p, 'Austin, TX 73301-0215', M + 12, ly + 24, 11, bold);
+  draw(p, r.irsAddress.noPayment[0], M + 12, ly + 54, 11, bold);
+  draw(p, r.irsAddress.noPayment[1], M + 12, ly + 39, 11, bold);
+  draw(p, r.irsAddress.noPayment[2], M + 12, ly + 24, 11, bold);
   draw(p, 'From My1040NR.com. Your information was never sent to anyone or stored.', M, 44, 9);
-  draw(p, 'Prepared with My1040NR rules ' + RULES_VERSION, M, 32, 9);
+  draw(p, 'Prepared with My1040NR rules ' + r.rulesVersion, M, 32, 9);
   /* Page 2: what to do next */
   p = doc.addPage([W, H]); y = H - 56;
   draw(p, 'Your Form 8843 is ready: what to do next', M, y, 15, bold); y -= 26;
@@ -165,14 +168,14 @@ async function makeFrontPages(PDFLib, d) {
    '3. Put the signed Form 8843 in an envelope. Keep the mailing slip',
    '    instructions for yourself, or place the slip on top.',
    '4. Address the envelope to the IRS address on the mailing slip.',
-   '5. Mail it by June 15, 2026. At the post office, ask for proof of mailing',
+   '5. Mail it by ' + r.deadlines.form8843 + '. At the post office, ask for proof of mailing',
    '    (a certificate of mailing) and keep it with your copy.',
    '',
    'My1040NR prepared this form only. We did not file or send anything',
    'for you, and we never received or stored your information: this PDF',
    'was made on your own device.',
    '',
-   'Prepared with My1040NR rules ' + RULES_VERSION + ' for tax year 2025.'].forEach(function (l) { draw(p, l, M, y, 11); y -= 16; });
+   'Prepared with My1040NR rules ' + r.rulesVersion + ' for tax year ' + r.year + '.'].forEach(function (l) { draw(p, l, M, y, 11); y -= 16; });
   return doc;
 }
 async function buildPackage(PDFLib, formBytes, d) {
@@ -194,22 +197,96 @@ async function buildPackage(PDFLib, formBytes, d) {
    Publication 901, Form 1040-NR instructions (2025), Rev. Proc. 2024-40 as
    amended for 2025 (standard deduction $15,750 single). */
 
-var NR_RULES_VERSION = '2025.1.0';
-var STD_DED_2025 = 15750;
-/* 2025 federal brackets, single and MFS (top of each bracket, rate). */
-var BRACKETS_2025 = {
-  single: [[11925, .10], [48475, .12], [103350, .22], [197300, .24], [250525, .32], [626350, .35], [Infinity, .37]],
-  mfs:    [[11925, .10], [48475, .12], [103350, .22], [197300, .24], [250525, .32], [313175, .35], [Infinity, .37]]
+/* ================= Per-year rules registry =================
+   Every figure that changes from one tax year to the next lives here, keyed
+   by tax year: federal amounts and brackets, treaty benefits, deadlines,
+   IRS mailing addresses, the official form PDFs, and each prepared state's
+   amounts, brackets, form and addresses. The engine and both interviews run
+   off this data (see docs/TAX-YEARS.md), so adding a tax year is a data
+   entry plus that year's form PDFs, not a rebuild. Figures keep their
+   TODO_VERIFY status until checked against that year's official
+   instructions and professionally reviewed. */
+var TAX_RULES = {
+  2025: {
+    year: 2025,
+    rulesVersion: '2025.1.0',
+    /* Rev. Proc. 2024-40 as amended for 2025. TODO_VERIFY per figure. */
+    standardDeduction: 15750,
+    /* Federal brackets, single and MFS (top of each bracket, rate). */
+    brackets: {
+      single: [[11925, .10], [48475, .12], [103350, .22], [197300, .24], [250525, .32], [626350, .35], [Infinity, .37]],
+      mfs:    [[11925, .10], [48475, .12], [103350, .22], [197300, .24], [250525, .32], [313175, .35], [Infinity, .37]]
+    },
+    /* Student treaty benefits. TODO_VERIFY against the IRS treaty tables. */
+    treaties: {
+      /* China, Article 20(c): up to $5,000 of employment income exempt. */
+      'China': { exemptWages: 5000, article: '20(c)' },
+      /* India, Article 21(2): students may claim the standard deduction. */
+      'India': { standardDeduction: true, article: '21(2)' }
+    },
+    deadlines: { federal: 'April 15, 2026', form8843: 'June 15, 2026', extensionTo: 'October 15, 2026' },
+    irsAddress: {
+      noPayment: ['Department of the Treasury', 'Internal Revenue Service', 'Austin, TX 73301-0215'],
+      payment: ['Internal Revenue Service', 'P.O. Box 1303, Charlotte, NC 28201-1303']
+    },
+    forms: {
+      f8843: 'assets/f8843-2025.pdf',
+      f1040nr: 'assets/f1040nr.pdf',
+      schedOI: 'assets/f1040nro.pdf',
+      sched1: 'assets/f1040s1.pdf'
+    },
+    states: {
+      noTax: ['AK', 'FL', 'NV', 'NH', 'SD', 'TN', 'TX', 'WA', 'WY'],
+      prep: ['CA', 'NY', 'MA', 'IL'],
+      CA: {
+        standardDeduction: 5537, /* single/MFS. TODO_VERIFY */
+        exemptionCredit: 153,
+        brackets: [[10749, .01], [25499, .02], [40245, .04], [55866, .06], [70606, .08], [349137, .093], [418961, .103], [698271, .113], [Infinity, .123]], /* TODO_VERIFY */
+        asset: 'assets/ca-540nr.pdf',
+        form: { form: 'Form 540NR', agency: 'California Franchise Tax Board', addrRefund: 'Franchise Tax Board, PO Box 942840, Sacramento, CA 94240-0001', addrOwe: 'Franchise Tax Board, PO Box 942867, Sacramento, CA 94267-0001', deadline: 'April 15, 2026 (California gives an automatic extension to October 15, 2026 to file, not to pay)' }
+      },
+      NY: {
+        standardDeduction: 8000, /* single */
+        brackets: [[8500, .04], [11700, .045], [13900, .0525], [80650, .055], [215400, .06], [1077550, .0685], [5000000, .0965], [25000000, .103], [Infinity, .109]], /* TODO_VERIFY */
+        asset: 'assets/ny-it203.pdf',
+        form: { form: 'Form IT-203', agency: 'New York State Tax Department', addrRefund: 'State Processing Center, PO Box 61000, Albany, NY 12261-0001', addrOwe: 'State Processing Center, PO Box 61000, Albany, NY 12261-0001', deadline: 'April 15, 2026' }
+      },
+      MA: {
+        personalExemption: 4400, /* single, prorated by the line 14g ratio */
+        ficaDeductionCap: 2000, /* line 15a */
+        rate: 0.05,
+        asset: 'assets/ma-1nrpy.pdf',
+        form: { form: 'Form 1-NR/PY', agency: 'Massachusetts Department of Revenue', addrRefund: 'Massachusetts DOR, PO Box 7000, Boston, MA 02204', addrOwe: 'Massachusetts DOR, PO Box 7003, Boston, MA 02204', deadline: 'April 15, 2026' }
+      },
+      IL: {
+        exemption: 2850, /* exemption allowance. TODO_VERIFY */
+        rate: 0.0495,
+        asset: 'assets/il-1040.pdf',
+        form: { form: 'Form IL-1040 with Schedule NR', agency: 'Illinois Department of Revenue', addrRefund: 'Illinois Department of Revenue, Springfield, IL 62719-0001', addrOwe: 'Illinois Department of Revenue, Springfield, IL 62726-0001', deadline: 'April 15, 2026' }
+      }
+    }
+  }
 };
-var TREATY_STUDENT_2025 = {
-  /* China, Article 20(c): up to $5,000 of employment income exempt. */
-  'China': { exemptWages: 5000, article: '20(c)' },
-  /* India, Article 21(2): students may claim the standard deduction (line 12). */
-  'India': { standardDeduction: true, article: '21(2)' }
-};
+function rulesFor(year) {
+  var r = TAX_RULES[year == null || year === '' ? TAX_YEAR : year];
+  if (!r) throw new Error('No rules registered for tax year ' + year);
+  return r;
+}
+function availableYears() {
+  return Object.keys(TAX_RULES).map(function (y) { return parseInt(y, 10); }).sort(function (a, b) { return a - b; });
+}
+function stateFormFor(year, code) {
+  var st = rulesFor(year).states[code];
+  return st ? st.form : null;
+}
+var NR_RULES_VERSION = TAX_RULES[2025].rulesVersion;
+var STD_DED_2025 = TAX_RULES[2025].standardDeduction;
+var BRACKETS_2025 = TAX_RULES[2025].brackets;
+var TREATY_STUDENT_2025 = TAX_RULES[2025].treaties;
 
-function bracketTax(income, status) {
-  var b = BRACKETS_2025[status] || BRACKETS_2025.single, prev = 0, tax = 0;
+function bracketTax(income, status, rules) {
+  var br = (rules || rulesFor()).brackets;
+  var b = br[status] || br.single, prev = 0, tax = 0;
   for (var i = 0; i < b.length; i++) {
     if (income > prev) { tax += (Math.min(income, b[i][0]) - prev) * b[i][1]; prev = b[i][0]; }
   }
@@ -217,43 +294,51 @@ function bracketTax(income, status) {
 }
 /* IRS Tax Table for income under $100,000 (midpoint of the $50 range,
    $25 ranges below $3,000), otherwise the Tax Computation Worksheet. */
-function taxTable2025(income, status) {
+function taxTable(income, status, rules) {
+  var r = rules || rulesFor();
   if (income <= 0) return 0;
-  if (income >= 100000) return Math.round(bracketTax(income, status));
+  if (income >= 100000) return Math.round(bracketTax(income, status, r));
   var step = income < 3000 ? 25 : 50;
   var mid = Math.floor(income / step) * step + step / 2;
-  return Math.round(bracketTax(mid, status));
+  return Math.round(bracketTax(mid, status, r));
 }
+function taxTable2025(income, status) { return taxTable(income, status, rulesFor(2025)); }
 
-/* Residency for 2025. Inputs: visaNow (e.g. 'F-1'), days {2023,2024,2025},
-   fjYearsThrough2025 = number of calendar years (including 2025) in which
-   the person held F or J status for any part of the year, greenCard bool. */
-function residency2025(d) {
+/* Residency for the chosen tax year. Inputs: visaNow (e.g. 'F-1'),
+   days {<year>, <year-1>, <year-2>}, fjYearsThrough<year> = number of
+   calendar years (including the tax year) in which the person held F or J
+   status for any part of the year, greenCard bool, taxYear. */
+function residencyForYear(d, rules) {
+  var r = rules || rulesFor(d.taxYear);
+  var Y = r.year;
   if (d.greenCard) return { resident: true, why: 'Green card test: resident alien.' };
   var isFJ = /^(F|J|M|Q)-?/.test(d.visaNow || '');
   function exemptYear(yearsThrough) { return isFJ && yearsThrough <= 5; }
-  var y25 = d.fjYearsThrough2025 || 0;
-  var ex25 = exemptYear(y25), ex24 = exemptYear(y25 - 1), ex23 = exemptYear(y25 - 2);
-  var weighted = (ex25 ? 0 : (d.days[2025] || 0))
-    + (ex24 ? 0 : (d.days[2024] || 0)) / 3
-    + (ex23 ? 0 : (d.days[2023] || 0)) / 6;
-  var spt = (d.days[2025] || 0) >= 31 && weighted >= 183;
-  if (ex25) return { resident: false, exempt: true, weighted: weighted, why: 'Exempt individual for 2025 (F/J within the 5 calendar year limit): days do not count, nonresident alien.' };
-  if (spt) return { resident: true, weighted: weighted, why: 'Substantial presence test met (' + Math.round(weighted) + ' weighted days): resident alien for 2025.' };
+  var yT = d['fjYearsThrough' + Y] || 0;
+  var exT = exemptYear(yT), ex1 = exemptYear(yT - 1), ex2 = exemptYear(yT - 2);
+  var days = d.days || {};
+  var weighted = (exT ? 0 : (days[Y] || 0))
+    + (ex1 ? 0 : (days[Y - 1] || 0)) / 3
+    + (ex2 ? 0 : (days[Y - 2] || 0)) / 6;
+  var spt = (days[Y] || 0) >= 31 && weighted >= 183;
+  if (exT) return { resident: false, exempt: true, weighted: weighted, why: 'Exempt individual for ' + Y + ' (F/J within the 5 calendar year limit): days do not count, nonresident alien.' };
+  if (spt) return { resident: true, weighted: weighted, why: 'Substantial presence test met (' + Math.round(weighted) + ' weighted days): resident alien for ' + Y + '.' };
   return { resident: false, exempt: false, weighted: weighted, why: 'Substantial presence test not met (' + Math.round(weighted) + ' weighted days): nonresident alien.' };
 }
+function residency2025(d) { return residencyForYear(d, rulesFor(2025)); }
 
 function computeNR(d) {
-  var treaty = TREATY_STUDENT_2025[d.treatyCountry] || null;
+  var r = rulesFor(d.taxYear);
+  var treaty = r.treaties[d.treatyCountry] || null;
   var grossWages = num(d.wagesW2) + num(d.wages1042);
   var exemptAmt = 0;
   if (treaty && treaty.exemptWages) exemptAmt = Math.min(treaty.exemptWages, grossWages);
   var line1a = grossWages, line1k = exemptAmt, line1z = line1a - line1k;
   var line8 = num(d.scholarshipTaxable);
   var line9 = line1z + line8;
-  var line12 = (treaty && treaty.standardDeduction) ? STD_DED_2025 : 0;
+  var line12 = (treaty && treaty.standardDeduction) ? r.standardDeduction : 0;
   var taxable = Math.max(0, line9 - line12);
-  var tax = taxTable2025(taxable, d.status === 'mfs' ? 'mfs' : 'single');
+  var tax = taxTable(taxable, d.status === 'mfs' ? 'mfs' : 'single', r);
   var payments = num(d.fedWithheldW2) + num(d.withheld1042);
   var ficaWithheld = num(d.ssTaxW2) + num(d.medTaxW2);
   return {
@@ -263,6 +348,7 @@ function computeNR(d) {
     line24: tax, line25a: num(d.fedWithheldW2), line25g: num(d.withheld1042),
     line33: payments, refund: payments > tax ? payments - tax : 0,
     owed: tax > payments ? tax - payments : 0,
+    taxYear: r.year, rulesVersion: r.rulesVersion,
     exemptAmt: exemptAmt, treatyArticle: treaty ? treaty.article : null,
     ficaWithheld: ficaWithheld,
     ficaFlag: ficaWithheld > 0 && /^(F|J)-?/.test(d.visaNow || '')
@@ -391,15 +477,16 @@ function checkUSAddress(addr) {
    the worksheet. California and Massachusetts do not honor the federal
    treaty wage exemption: exempt wages are added back for state totals. */
 
-var NO_TAX_STATES = ['AK', 'FL', 'NV', 'NH', 'SD', 'TN', 'TX', 'WA', 'WY'];
-var PREP_STATES = ['CA', 'NY', 'MA', 'IL'];
+var NO_TAX_STATES = TAX_RULES[2025].states.noTax;
+var PREP_STATES = TAX_RULES[2025].states.prep;
 
 function stateDetermination(d, c) {
+  var sr = rulesFor(d.taxYear).states;
   var st = (d.stCode || '').toUpperCase();
   var out = { state: st, action: 'none', reason: '' };
   if (!st) { out.reason = 'No W-2 state row was entered, so no state return is prepared. If you worked in a state with an income tax, check the state checker on this site.'; return out; }
-  if (NO_TAX_STATES.indexOf(st) >= 0) { out.action = 'notax'; out.reason = st + ' has no state income tax on wages, so there is no state return to file for this income.'; return out; }
-  if (PREP_STATES.indexOf(st) >= 0 && num(d.stWages) > 0) {
+  if (sr.noTax.indexOf(st) >= 0) { out.action = 'notax'; out.reason = st + ' has no state income tax on wages, so there is no state return to file for this income.'; return out; }
+  if (sr.prep.indexOf(st) >= 0 && num(d.stWages) > 0) {
     out.action = 'prepare'; out.reason = 'You have ' + st + ' wages on your W-2, so a ' + st + ' nonresident return is prepared in this package.';
     return out;
   }
@@ -409,45 +496,49 @@ function stateDetermination(d, c) {
   return out;
 }
 
-var CA_BRACKETS_2025 = [[10749, .01], [25499, .02], [40245, .04], [55866, .06], [70606, .08], [349137, .093], [418961, .103], [698271, .113], [Infinity, .123]]; /* TODO_VERIFY */
-function caTax(income) {
+var CA_BRACKETS_2025 = TAX_RULES[2025].states.CA.brackets;
+function caTax(income, brackets) {
+  var b = brackets || CA_BRACKETS_2025;
   var prev = 0, tax = 0;
-  for (var i = 0; i < CA_BRACKETS_2025.length; i++) { if (income > prev) { tax += (Math.min(income, CA_BRACKETS_2025[i][0]) - prev) * CA_BRACKETS_2025[i][1]; prev = CA_BRACKETS_2025[i][0]; } }
+  for (var i = 0; i < b.length; i++) { if (income > prev) { tax += (Math.min(income, b[i][0]) - prev) * b[i][1]; prev = b[i][0]; } }
   return Math.round(tax);
 }
 function computeCA(d, c) {
-  var sd = 5537; /* CA standard deduction, single/MFS 2025. TODO_VERIFY */
+  var csr = rulesFor(d.taxYear).states.CA;
+  var sd = csr.standardDeduction;
   var totalAll = c.line9 + c.exemptAmt;             /* treaty wages added back */
   var caAGI = num(d.stWages) + num(d.scholarshipTaxable) + (c.grossWages > 0 ? c.exemptAmt * (num(d.stWages) / c.grossWages) : 0);
   var l13 = c.line11a, l16 = c.exemptAmt, l17 = l13 + l16;
   var l19 = Math.max(0, l17 - sd);
-  var l31 = caTax(l19);
+  var l31 = caTax(l19, csr.brackets);
   var dedShare = l17 > 0 ? sd * (caAGI / l17) : 0;
   var l35 = Math.max(0, Math.round(caAGI - dedShare));
   var rate = l19 > 0 ? l31 / l19 : 0;
   var l37 = Math.round(l35 * rate);
   var pct = l19 > 0 ? l35 / l19 : 0;
-  var l39 = Math.round(153 * pct);                   /* prorated personal exemption credit, $153 for 2025 */
+  var l39 = Math.round(csr.exemptionCredit * pct);   /* prorated personal exemption credit */
   var tax = Math.max(0, l37 - l39);
   var pay = num(d.stWithheld);
-  return { l11: 153, l12: num(d.stWages), l13: l13, l16: l16, l17: l17, l18: sd, l19: l19, l31: l31, l35: l35,
+  return { l11: csr.exemptionCredit, l12: num(d.stWages), l13: l13, l16: l16, l17: l17, l18: sd, l19: l19, l31: l31, l35: l35,
     rate: rate, l37: l37, pct: pct, l39: l39, l40: tax, tax: tax, payments: pay,
     refund: pay > tax ? pay - tax : 0, owed: tax > pay ? tax - pay : 0, caAGI: Math.round(caAGI), totalAll: totalAll };
 }
 
-var NY_BRACKETS_2025 = [[8500, .04], [11700, .045], [13900, .0525], [80650, .055], [215400, .06], [1077550, .0685], [5000000, .0965], [25000000, .103], [Infinity, .109]]; /* TODO_VERIFY */
-function nyTax(income) {
+var NY_BRACKETS_2025 = TAX_RULES[2025].states.NY.brackets;
+function nyTax(income, brackets) {
+  var b = brackets || NY_BRACKETS_2025;
   var prev = 0, tax = 0;
-  for (var i = 0; i < NY_BRACKETS_2025.length; i++) { if (income > prev) { tax += (Math.min(income, NY_BRACKETS_2025[i][0]) - prev) * NY_BRACKETS_2025[i][1]; prev = NY_BRACKETS_2025[i][0]; } }
+  for (var i = 0; i < b.length; i++) { if (income > prev) { tax += (Math.min(income, b[i][0]) - prev) * b[i][1]; prev = b[i][0]; } }
   return Math.round(tax);
 }
 function computeNY(d, c) {
-  var sd = 8000; /* NY standard deduction, single 2025 */
+  var nyr = rulesFor(d.taxYear).states.NY;
+  var sd = nyr.standardDeduction;
   var fedWages = c.line1z, fedOther = c.line8, fedAGI = c.line11a;
   var nysWages = num(d.stWages), nysOther = num(d.scholarshipTaxable);
   var nysAGI = nysWages + nysOther;
   var l34 = Math.max(0, fedAGI - sd);
-  var tax38 = nyTax(l34);
+  var tax38 = nyTax(l34, nyr.brackets);
   var pct = fedAGI > 0 ? Math.min(1, nysAGI / fedAGI) : 0;
   var tax = Math.round(tax38 * pct);
   var pay = num(d.stWithheld);
@@ -457,14 +548,15 @@ function computeNY(d, c) {
 }
 
 function computeMA(d, c) {
+  var mar = rulesFor(d.taxYear).states.MA;
   var maIncome = num(d.stWages) + num(d.scholarshipTaxable);
   var totalIncome = c.line1a + c.line8;              /* gross wages incl. treaty-exempt, plus scholarship */
   var ratio = totalIncome > 0 ? Math.min(1, maIncome / totalIncome) : 0;
-  var ficaDed = Math.min(2000, num(d.ssTaxW2) + num(d.medTaxW2)); /* MA line 15a deduction */
+  var ficaDed = Math.min(mar.ficaDeductionCap, num(d.ssTaxW2) + num(d.medTaxW2)); /* MA line 15a deduction */
   var afterDed = Math.max(0, maIncome - ficaDed);
-  var exemption = Math.round(4400 * ratio);          /* personal exemption $4,400 single, prorated (line 22) */
+  var exemption = Math.round(mar.personalExemption * ratio); /* personal exemption, prorated (line 22) */
   var taxable = Math.max(0, afterDed - exemption);
-  var tax = Math.round(taxable * 0.05);
+  var tax = Math.round(taxable * mar.rate);
   var pay = num(d.stWithheld);
   return { maIncome: maIncome, totalIncome: totalIncome, ratio: ratio, ficaDed: ficaDed, afterDed: afterDed,
     exemption: exemption, taxable: taxable, tax: tax, payments: pay,
@@ -472,12 +564,13 @@ function computeMA(d, c) {
 }
 
 function computeIL(d, c) {
+  var ilr = rulesFor(d.taxYear).states.IL;
   var ilIncome = num(d.stWages) + num(d.scholarshipTaxable);
   var totalBase = c.line11a;
   var ratio = totalBase > 0 ? Math.min(1, ilIncome / totalBase) : 0;
-  var exemption = Math.round(2850 * ratio);          /* IL exemption allowance 2025. TODO_VERIFY */
+  var exemption = Math.round(ilr.exemption * ratio); /* IL exemption allowance */
   var net = Math.max(0, ilIncome - exemption);
-  var tax = Math.round(net * 0.0495);
+  var tax = Math.round(net * ilr.rate);
   var pay = num(d.stWithheld);
   return { ilIncome: ilIncome, totalBase: totalBase, ratio: ratio, exemption: exemption, net: net,
     tax: tax, payments: pay, refund: pay > tax ? pay - tax : 0, owed: tax > pay ? tax - pay : 0 };
@@ -490,12 +583,10 @@ function stateCalc(st, d, c) {
   if (st === 'IL') return computeIL(d, c);
   return null;
 }
-var STATE_FORMS = {
-  CA: { form: 'Form 540NR', agency: 'California Franchise Tax Board', addrRefund: 'Franchise Tax Board, PO Box 942840, Sacramento, CA 94240-0001', addrOwe: 'Franchise Tax Board, PO Box 942867, Sacramento, CA 94267-0001', deadline: 'April 15, 2026 (California gives an automatic extension to October 15, 2026 to file, not to pay)' },
-  NY: { form: 'Form IT-203', agency: 'New York State Tax Department', addrRefund: 'State Processing Center, PO Box 61000, Albany, NY 12261-0001', addrOwe: 'State Processing Center, PO Box 61000, Albany, NY 12261-0001', deadline: 'April 15, 2026' },
-  MA: { form: 'Form 1-NR/PY', agency: 'Massachusetts Department of Revenue', addrRefund: 'Massachusetts DOR, PO Box 7000, Boston, MA 02204', addrOwe: 'Massachusetts DOR, PO Box 7003, Boston, MA 02204', deadline: 'April 15, 2026' },
-  IL: { form: 'Form IL-1040 with Schedule NR', agency: 'Illinois Department of Revenue', addrRefund: 'Illinois Department of Revenue, Springfield, IL 62719-0001', addrOwe: 'Illinois Department of Revenue, Springfield, IL 62726-0001', deadline: 'April 15, 2026' }
-};
+/* The current default year's state form data, derived from the registry.
+   Callers that know the filer's tax year use stateFormFor(year, code). */
+var STATE_FORMS = {};
+['CA', 'NY', 'MA', 'IL'].forEach(function (code) { STATE_FORMS[code] = TAX_RULES[2025].states[code].form; });
 
 /* ---------- state form fillers ---------- */
 function fieldsByName(form) { var m = {}; form.getFields().forEach(function (f) { m[f.getName()] = f; }); return m; }
@@ -711,7 +802,8 @@ async function fillIL(PDFLib, bytes, d, s, fed) {
 if (typeof module !== 'undefined') {
   module.exports = {
     buildPackage, fill8843, studentYearCount, RULES_VERSION, FIELD, CHECK,
-    computeNR, residency2025, stateDetermination, stateCalc, computeCA,
-    computeNY, computeMA, computeIL, checkUSAddress
+    computeNR, residency2025, residencyForYear, taxTable, stateDetermination, stateCalc, computeCA,
+    computeNY, computeMA, computeIL, checkUSAddress,
+    TAX_YEAR, TAX_RULES, rulesFor, availableYears, stateFormFor
   };
 }
