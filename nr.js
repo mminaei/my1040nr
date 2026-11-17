@@ -619,7 +619,7 @@
   function stateWorksheet(st, s) {
     if (st === 'CA') return 'California income ' + money(s.caAGI) + ' of ' + money(s.totalAll) + ' total (treaty wages added back for California).';
     if (st === 'NY') return 'New York income ' + money(s.nysAGI) + ' of ' + money(s.fedAGI) + ' federal (' + (s.pct * 100).toFixed(1) + '% allocated). Household credit not claimed.';
-    if (st === 'MA') return 'Massachusetts income ' + money(s.maIncome) + ' of ' + money(s.totalIncome) + ' total; exemption prorated to ' + money(s.exemption) + (s.ficaDed ? '; FICA deduction ' + money(s.ficaDed) : '') + '.';
+    if (st === 'MA') return 'Massachusetts income ' + money(s.maIncome) + ' of ' + money(s.totalIncome) + ' total; exemption prorated to ' + money(s.exemption) + (s.treatyExempt ? '; treaty-exempt wages ' + money(s.treatyExempt) + ' subtracted (Schedule Y, line 4b)' : '') + (s.ficaDed ? '; FICA deduction ' + money(s.ficaDed) : '') + '.';
     if (st === 'IL') return 'Illinois income ' + money(s.ilIncome) + '; prorated exemption ' + money(s.exemption) + '; net ' + money(s.net) + ' at 4.95%. These are your Schedule NR numbers.';
     return '';
   }
@@ -657,7 +657,7 @@
     var notes = {
       CA: 'California does not honor the federal treaty exemption: treaty-exempt wages were added back on line 16. Schedule CA (540NR) is not attached in this version; if the FTB asks for it, your California amounts are on the summary worksheet in this package.',
       NY: 'New York household credit (up to $75 for many students) is not claimed in this version. As a New York nonresident you owe no New York City income tax.',
-      MA: 'Massachusetts amounts are entered as Massachusetts source income, the way Form 1-NR/PY asks nonresidents to report. Your exemption was prorated on line 22 using the line 14g ratio. Enclose Schedule HC if it applies to you.',
+      MA: 'Massachusetts amounts are entered as Massachusetts source income, the way Form 1-NR/PY asks nonresidents to report. Your exemption was prorated on line 22 using the line 14g ratio. Massachusetts follows the federal treaty exclusion: if your W-2 wages included treaty-exempt pay, it was subtracted here (on the paper form that subtraction is Schedule Y, line 4b, which is not attached in this version; the amount is on the summary worksheet). Enclose Schedule HC if it applies to you.',
       IL: 'Schedule NR is not attached in this version. Your Schedule NR numbers are on the summary worksheet in this package; if Illinois asks for the schedule, copy them in.'
     }[st];
     return textPage(PDFLib, 'State mailing slip: ' + sf.form + ' (' + st + ', ' + Y() + ')', [
