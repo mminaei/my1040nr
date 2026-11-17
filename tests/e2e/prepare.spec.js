@@ -150,7 +150,7 @@ test('Form 8843 download has the expected filename, page order, and selected out
   const selectedValues = ['JORDAN EXAMPLE SAMPLE', '123 FICTIONAL WAY', 'CANADA', 'EXAMPLE UNIVERSITY'];
   expect(selectedValues.every(value => fullText.includes(value)),
     'Generated PDF should include the selected fictional interview answers').toBe(true);
-  expect(fullText.includes('2025.1.0'), 'Generated PDF should include the rules version').toBe(true);
+  expect(fullText.includes('2025.2.0'), 'Generated PDF should include the rules version').toBe(true);
 });
 
 test('income notice links to the implemented Form 1040-NR preparer', async ({ page }) => {

@@ -30,4 +30,4 @@ The checked-in PDFs in `assets/` are form templates and do not, by themselves, v
 
 ## Release posture
 
-The implemented 1040-NR path and its regression suite are not equivalent to a verified tax product. Do not claim professional readiness until authoritative tax-year source verification and qualified professional review are complete, and do not rely on unsupported or `TODO_VERIFY` outcomes for an individual return.
+The implemented 1040-NR path and its regression suite are not equivalent to a verified tax product. The 2025 figures were checked against the official instructions in the 2026-11-16 verification pass (sources cited in the rules registry and the state fixtures, with five errors found and corrected), but qualified professional review (CPA or EA sign-off) is still outstanding. Do not claim professional readiness, and do not rely on the engine for an individual return, until that review is complete.

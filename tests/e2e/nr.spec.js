@@ -5,9 +5,9 @@ const stateCases = require('../fixtures/state-cases.js');
 const appOrigin = 'http://127.0.0.1:4173';
 const syntheticTin = '000000000';
 
-function expectUnverifiedStateCase(id) {
+function expectVerifiedStateCase(id) {
   const fixture = stateCases.find(stateCase => stateCase.id === id);
-  expect(fixture && fixture.verificationStatus).toBe('TODO_VERIFY');
+  expect(fixture && fixture.verificationStatus).toBe('verified');
 }
 
 async function beginNonresidentInterview(page, state = 'TX') {
@@ -97,7 +97,7 @@ test('manual nonresident entry keeps the identifier last and downloads the feder
   const consoleMessages = [];
   page.on('console', message => consoleMessages.push(message.text()));
 
-  expectUnverifiedStateCase('tx-no-tax');
+  expectVerifiedStateCase('tx-no-tax');
   await beginNonresidentInterview(page, 'TX');
   await enterManualW2(page, { state: 'TX', stateWages: '12000' });
   await completeTreatyDetails(page);
@@ -224,7 +224,7 @@ test('synthetic W-2 candidates require confirmation and no-state-row acknowledge
 });
 
 test('California prepared-state package puts its separate slip before the state form', async ({ page }) => {
-  expectUnverifiedStateCase('ca-wages');
+  expectVerifiedStateCase('ca-wages');
   await beginNonresidentInterview(page, 'CA');
   await enterManualW2(page, {
     state: 'CA',
