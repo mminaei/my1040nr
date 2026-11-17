@@ -130,3 +130,36 @@ test('Illinois mailing addresses match the 2025 IL-1040 instructions', () => {
   assert.match(il.addrRefund, /PO Box 19041, Springfield, IL 62794-9041/);
   assert.match(il.addrOwe, /PO Box 19027, Springfield, IL 62794-9027/);
 });
+
+test('California treaty allocation never exceeds 100 percent (China add-back)', () => {
+  // W-2 box 16 is gross CA wages and already includes the $5,000 treaty-
+  // exempt part. Before the 2026-11-16 fix, computeCA added the exempt
+  // share to CA-source income a second time: the allocation ratio hit
+  // 125 percent and the prorated exemption credit $191, above the $153
+  // statutory credit. Correct: tax $22, refund $978, credit exactly $153.
+  const federal = computeNR({
+    status: 'single', treatyCountry: 'China', wagesW2: '20000', wages1042: '0',
+    scholarshipTaxable: '0', fedWithheldW2: '0', withheld1042: '0',
+    ssTaxW2: '0', medTaxW2: '0', visaNow: 'F-1'
+  });
+  const ca = stateCalc('CA', { stCode: 'CA', stWages: '20000', stWithheld: '1000', scholarshipTaxable: '0' }, federal);
+  assert.equal(ca.caAGI, 20000);
+  assert.equal(ca.l35, 14294);
+  assert.equal(ca.pct, 1);
+  assert.equal(ca.l39, 153);
+  assert.equal(ca.tax, 22);
+  assert.equal(ca.refund, 978);
+
+  // Partial California: $30,000 of total wages, $20,000 of them CA wages.
+  const federalP = computeNR({
+    status: 'single', treatyCountry: 'China', wagesW2: '30000', wages1042: '0',
+    scholarshipTaxable: '0', fedWithheldW2: '0', withheld1042: '0',
+    ssTaxW2: '0', medTaxW2: '0', visaNow: 'F-1'
+  });
+  const caP = stateCalc('CA', { stCode: 'CA', stWages: '20000', stWithheld: '600', scholarshipTaxable: '0' }, federalP);
+  assert.equal(caP.caAGI, 20000);
+  assert.equal(caP.totalAll, 30000);
+  assert.equal(caP.l39, 102);
+  assert.equal(caP.tax, 148);
+  assert.equal(caP.refund, 452);
+});
