@@ -535,7 +535,13 @@ function computeCA(d, c) {
   var csr = rulesFor(d.taxYear).states.CA;
   var sd = csr.standardDeduction;
   var totalAll = c.line9 + c.exemptAmt;             /* treaty wages added back */
-  var caAGI = num(d.stWages) + num(d.scholarshipTaxable) + (c.grossWages > 0 ? c.exemptAmt * (num(d.stWages) / c.grossWages) : 0);
+  /* CA-source income. W-2 box 16 is gross California wages, so it already
+     includes any treaty-exempt part; the treaty add-back belongs only to the
+     federal-to-California column math (l13 + l16 = l17 below). An earlier
+     version added the exempt share to caAGI a second time, which pushed the
+     allocation ratio and the prorated exemption credit above 100 percent on
+     treaty returns (found 2026-11-16 while building the EA review packet). */
+  var caAGI = num(d.stWages) + num(d.scholarshipTaxable);
   var l13 = c.line11a, l16 = c.exemptAmt, l17 = l13 + l16;
   var l19 = Math.max(0, l17 - sd);
   var l31 = caTax(l19, csr.brackets);
