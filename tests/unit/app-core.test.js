@@ -41,7 +41,7 @@ test('studentYearCount counts a calendar year only once', () => {
   }), 5);
 });
 
-test('TODO_VERIFY: a student within the five-calendar-year limit is nonresident for the SPT calculation', () => {
+test('a student within the five-calendar-year limit is nonresident for the SPT calculation', () => {
   const result = residency2025({
     visaNow: 'F-1',
     greenCard: false,
@@ -53,7 +53,7 @@ test('TODO_VERIFY: a student within the five-calendar-year limit is nonresident 
   assert.equal(result.exempt, true);
 });
 
-test('TODO_VERIFY: F and J student exemption changes at the five-calendar-year boundary', () => {
+test('F and J student exemption changes at the five-calendar-year boundary', () => {
   for (const visaNow of ['F-1', 'J-1']) {
     const fifthYear = residency2025({
       visaNow,
@@ -74,7 +74,7 @@ test('TODO_VERIFY: F and J student exemption changes at the five-calendar-year b
   }
 });
 
-test('TODO_VERIFY: SPT requires at least 31 current-year days and 183 weighted days', () => {
+test('SPT requires at least 31 current-year days and 183 weighted days', () => {
   const under31Days = residency2025({
     visaNow: 'B-2',
     greenCard: false,
@@ -94,7 +94,7 @@ test('TODO_VERIFY: SPT requires at least 31 current-year days and 183 weighted d
   assert.equal(at31Days.weighted, 31 + 365 / 3 + 190 / 6);
 });
 
-test('TODO_VERIFY: SPT weighted-day threshold applies when current-year minimum is met', () => {
+test('SPT weighted-day threshold applies when current-year minimum is met', () => {
   const belowWeightedThreshold = residency2025({
     visaNow: 'B-2',
     greenCard: false,
@@ -115,7 +115,7 @@ test('TODO_VERIFY: SPT weighted-day threshold applies when current-year minimum 
   assert.equal(atWeightedThreshold.resident, true);
 });
 
-test('TODO_VERIFY: green-card status overrides the student exemption and day count', () => {
+test('green-card status overrides the student exemption and day count', () => {
   const result = residency2025({
     visaNow: 'F-1',
     greenCard: true,
@@ -127,7 +127,7 @@ test('TODO_VERIFY: green-card status overrides the student exemption and day cou
   assert.match(result.why, /Green card test/);
 });
 
-test('TODO_VERIFY: single and MFS status both produce federal tax-table line results', () => {
+test('single and MFS status both produce federal tax-table line results', () => {
   const base = {
     treatyCountry: '',
     wagesW2: '15000',
@@ -151,7 +151,7 @@ test('TODO_VERIFY: single and MFS status both produce federal tax-table line res
   assert.equal(mfs.refund, 0);
 });
 
-test('TODO_VERIFY: single and MFS use their current status-specific worksheet brackets above the tax-table range', () => {
+test('single and MFS use their current status-specific worksheet brackets above the tax-table range', () => {
   const base = {
     treatyCountry: '',
     wagesW2: '400000',
@@ -169,11 +169,17 @@ test('TODO_VERIFY: single and MFS use their current status-specific worksheet br
   assert.ok(Number.isFinite(single.line16));
   assert.ok(Number.isFinite(mfs.line16));
   assert.notEqual(single.line16, mfs.line16);
+  // Exact figures per Rev. Proc. 2024-40: at $400,000 of taxable income the
+  // MFS 35 percent bracket runs to $375,800 (Table 4), so MFS tax is
+  // $110,031 and single tax is $109,547. The MFS figure was $111,284 before
+  // the 2026-11-16 correction of the bracket top from $313,175.
+  assert.equal(single.line16, 109547);
+  assert.equal(mfs.line16, 110031);
   assert.equal(single.line16, single.line24);
   assert.equal(mfs.line16, mfs.line24);
 });
 
-test('TODO_VERIFY: empty numeric fields become zero and negative inputs retain numeric sign', () => {
+test('empty numeric fields become zero and negative inputs retain numeric sign', () => {
   const empty = computeNR({
     status: 'single',
     treatyCountry: '',

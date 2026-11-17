@@ -2,7 +2,7 @@
    browser today, inside the desktop shell later. No network calls are made
    with user data. Nothing is stored: all state lives in page memory. */
 'use strict';
-const RULES_VERSION = '2025.1.0';
+const RULES_VERSION = '2025.2.0';
 var COUNTRIES = ["Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cambodia", "Cameroon", "Canada", "Cape Verde", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "East Timor", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hong Kong", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Ivory Coast", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"];
 function countryOpts() { return COUNTRIES.map(function (c) { return [c, c]; }); }
 
@@ -192,10 +192,14 @@ async function buildPackage(PDFLib, formBytes, d) {
    Scope v1: nonresident alien students with effectively connected income from
    Form W-2 and/or Form 1042-S (wages and taxable scholarship/fellowship),
    single or married filing separately, no dependents, no NEC income.
-   Treaty table v1: TODO_VERIFY against the IRS tax treaty tables and each
-   treaty text before public reliance. Sources: IRS Tax Treaties page,
-   Publication 901, Form 1040-NR instructions (2025), Rev. Proc. 2024-40 as
-   amended for 2025 (standard deduction $15,750 single). */
+   Treaty table v1: verified 2026-11-16 against IRS Publication 901
+   (09/2024), Students, Apprentices, and Trainees chapter (China and India
+   sections), and Publication 519 chapter 5 (India standard deduction,
+   Worksheet 5-1). Sources: IRS Tax Treaties page, Publication 901,
+   Form 1040-NR instructions (2025), Rev. Proc. 2024-40 as amended for
+   2025 (standard deduction $15,750 single, set by P.L. 119-21 and
+   reflected in Rev. Proc. 2025-32). Professional review (CPA or EA
+   sign-off) is still outstanding; see docs/READINESS.md. */
 
 /* ================= Per-year rules registry =================
    Every figure that changes from one tax year to the next lives here, keyed
@@ -203,21 +207,28 @@ async function buildPackage(PDFLib, formBytes, d) {
    IRS mailing addresses, the official form PDFs, and each prepared state's
    amounts, brackets, form and addresses. The engine and both interviews run
    off this data (see docs/TAX-YEARS.md), so adding a tax year is a data
-   entry plus that year's form PDFs, not a rebuild. Figures keep their
-   TODO_VERIFY status until checked against that year's official
-   instructions and professionally reviewed. */
+   entry plus that year's form PDFs, not a rebuild. The 2025 figures were
+   verified on 2026-11-16 against that year's official instructions, with
+   the source cited at each figure; a qualified professional review (CPA
+   or EA sign-off) is still outstanding. */
 var TAX_RULES = {
   2025: {
     year: 2025,
-    rulesVersion: '2025.1.0',
-    /* Rev. Proc. 2024-40 as amended for 2025. TODO_VERIFY per figure. */
+    rulesVersion: '2025.2.0',
+    /* Brackets: Rev. Proc. 2024-40, section 2.01 tax rate tables.
+       Standard deduction: P.L. 119-21 section 63(c)(7) amounts for 2025,
+       as reflected in Rev. Proc. 2025-32. Verified 2026-11-16. */
     standardDeduction: 15750,
-    /* Federal brackets, single and MFS (top of each bracket, rate). */
+    /* Federal brackets, single and MFS (top of each bracket, rate).
+       MFS note: the 35 percent bracket ends at $375,800 (half the joint
+       threshold), not at half the single threshold; corrected 2026-11-16
+       from $313,175 per Rev. Proc. 2024-40, Table 4. */
     brackets: {
       single: [[11925, .10], [48475, .12], [103350, .22], [197300, .24], [250525, .32], [626350, .35], [Infinity, .37]],
-      mfs:    [[11925, .10], [48475, .12], [103350, .22], [197300, .24], [250525, .32], [313175, .35], [Infinity, .37]]
+      mfs:    [[11925, .10], [48475, .12], [103350, .22], [197300, .24], [250525, .32], [375800, .35], [Infinity, .37]]
     },
-    /* Student treaty benefits. TODO_VERIFY against the IRS treaty tables. */
+    /* Student treaty benefits. Verified 2026-11-16 against IRS
+       Publication 901 (09/2024), China and India student sections. */
     treaties: {
       /* China, Article 20(c): up to $5,000 of employment income exempt. */
       'China': { exemptWages: 5000, article: '20(c)' },
@@ -225,6 +236,8 @@ var TAX_RULES = {
       'India': { standardDeduction: true, article: '21(2)' }
     },
     deadlines: { federal: 'April 15, 2026', form8843: 'June 15, 2026', extensionTo: 'October 15, 2026' },
+    /* Mailing addresses: Instructions for Form 1040-NR (2025), Where to
+       File, for returns filed in 2026. Verified 2026-11-16. */
     irsAddress: {
       noPayment: ['Department of the Treasury', 'Internal Revenue Service', 'Austin, TX 73301-0215'],
       payment: ['Internal Revenue Service', 'P.O. Box 1303, Charlotte, NC 28201-1303']
@@ -239,19 +252,29 @@ var TAX_RULES = {
       noTax: ['AK', 'FL', 'NV', 'NH', 'SD', 'TN', 'TX', 'WA', 'WY'],
       prep: ['CA', 'NY', 'MA', 'IL'],
       CA: {
-        standardDeduction: 5537, /* single/MFS. TODO_VERIFY */
+        /* FTB Tax News, October 2025 (2025 indexing, Schedule X for single
+           and married filing separately). Verified 2026-11-16. The prior
+           values were the 2024 schedule and a $5,537 deduction; corrected. */
+        standardDeduction: 5706, /* single/MFS */
         exemptionCredit: 153,
-        brackets: [[10749, .01], [25499, .02], [40245, .04], [55866, .06], [70606, .08], [349137, .093], [418961, .103], [698271, .113], [Infinity, .123]], /* TODO_VERIFY */
+        brackets: [[11079, .01], [26264, .02], [41452, .04], [57542, .06], [72724, .08], [371479, .093], [445771, .103], [742953, .113], [Infinity, .123]],
         asset: 'assets/ca-540nr.pdf',
         form: { form: 'Form 540NR', agency: 'California Franchise Tax Board', addrRefund: 'Franchise Tax Board, PO Box 942840, Sacramento, CA 94240-0001', addrOwe: 'Franchise Tax Board, PO Box 942867, Sacramento, CA 94267-0001', deadline: 'April 15, 2026 (California gives an automatic extension to October 15, 2026 to file, not to pay)' }
       },
       NY: {
         standardDeduction: 8000, /* single */
-        brackets: [[8500, .04], [11700, .045], [13900, .0525], [80650, .055], [215400, .06], [1077550, .0685], [5000000, .0965], [25000000, .103], [Infinity, .109]], /* TODO_VERIFY */
+        brackets: [[8500, .04], [11700, .045], [13900, .0525], [80650, .055], [215400, .06], [1077550, .0685], [5000000, .0965], [25000000, .103], [Infinity, .109]], /* 2025 Instructions for Form IT-203, New York State tax rate schedule (single and MFS). Verified 2026-11-16. */
         asset: 'assets/ny-it203.pdf',
         form: { form: 'Form IT-203', agency: 'New York State Tax Department', addrRefund: 'State Processing Center, PO Box 61000, Albany, NY 12261-0001', addrOwe: 'State Processing Center, PO Box 61000, Albany, NY 12261-0001', deadline: 'April 15, 2026' }
       },
       MA: {
+        /* Mass. DOR sources, verified 2026-11-16: personal exemption
+           $4,400 and 5 percent rate (Form 1-NR/PY and DOR guidance);
+           FICA deduction cap $2,000 (DOR, Social Security (FICA) and
+           Medicare Deduction, Form 1-NR/PY line 15a). Massachusetts
+           recognizes the federal treaty exclusion for nonresidents
+           (DOR, Legal and Residency Status; Directive 87-4), claimed on
+           Schedule Y, line 4b. */
         personalExemption: 4400, /* single, prorated by the line 14g ratio */
         ficaDeductionCap: 2000, /* line 15a */
         rate: 0.05,
@@ -259,10 +282,10 @@ var TAX_RULES = {
         form: { form: 'Form 1-NR/PY', agency: 'Massachusetts Department of Revenue', addrRefund: 'Massachusetts DOR, PO Box 7000, Boston, MA 02204', addrOwe: 'Massachusetts DOR, PO Box 7003, Boston, MA 02204', deadline: 'April 15, 2026' }
       },
       IL: {
-        exemption: 2850, /* exemption allowance. TODO_VERIFY */
+        exemption: 2850, /* exemption allowance, 2025 IL-1040 Instructions. Verified 2026-11-16. */
         rate: 0.0495,
         asset: 'assets/il-1040.pdf',
-        form: { form: 'Form IL-1040 with Schedule NR', agency: 'Illinois Department of Revenue', addrRefund: 'Illinois Department of Revenue, Springfield, IL 62719-0001', addrOwe: 'Illinois Department of Revenue, Springfield, IL 62726-0001', deadline: 'April 15, 2026' }
+        form: { form: 'Form IL-1040 with Schedule NR', agency: 'Illinois Department of Revenue', addrRefund: 'Illinois Department of Revenue, PO Box 19041, Springfield, IL 62794-9041', addrOwe: 'Illinois Department of Revenue, PO Box 19027, Springfield, IL 62794-9027', deadline: 'April 15, 2026' }
       }
     }
   }
@@ -468,14 +491,19 @@ function checkUSAddress(addr) {
 
 /* ================= State pipeline v1 (tax year 2025) =================
    Full preparation: CA (540NR), NY (IT-203), MA (Form 1-NR/PY), IL (IL-1040).
-   Figures marked TODO_VERIFY must be checked against each state's official
-   2025 booklet before public reliance. Sources: FTB 540NR booklet, NY IT-203
-   instructions, MA Form 1-NR/PY instructions, IL-1040 and Schedule NR
-   instructions. State-source rule used throughout: the W-2 state row
+   Figures verified 2026-11-16 against each state's official 2025
+   instructions, with sources cited in the registry above: FTB Tax News
+   (October 2025) and the 540NR booklet, NY IT-203 instructions, Mass. DOR
+   guidance and Form 1-NR/PY, IL-1040 and Schedule NR instructions.
+   State-source rule used throughout: the W-2 state row
    (boxes 15-17) defines state wages and state withholding; taxable
    scholarship is treated as sourced to the prepared state and disclosed on
-   the worksheet. California and Massachusetts do not honor the federal
-   treaty wage exemption: exempt wages are added back for state totals. */
+   the worksheet. Treaty treatment differs by state: California does not
+   honor the federal treaty wage exemption, so exempt wages are added back
+   for California. Massachusetts recognizes the exclusion (Schedule Y,
+   line 4b), so the treaty-exempt share of Massachusetts wages is
+   subtracted. New York and Illinois start from federal amounts, so
+   treaty-exempt wages stay excluded there. */
 
 var NO_TAX_STATES = TAX_RULES[2025].states.noTax;
 var PREP_STATES = TAX_RULES[2025].states.prep;
@@ -549,8 +577,14 @@ function computeNY(d, c) {
 
 function computeMA(d, c) {
   var mar = rulesFor(d.taxYear).states.MA;
-  var maIncome = num(d.stWages) + num(d.scholarshipTaxable);
-  var totalIncome = c.line1a + c.line8;              /* gross wages incl. treaty-exempt, plus scholarship */
+  /* Massachusetts recognizes the federal treaty exclusion for
+     nonresidents (Mass. DOR, Legal and Residency Status; Directive 87-4):
+     treaty-exempt wages inside the W-2 state row are subtracted, the
+     Schedule Y, line 4b treatment. The exempt share of state wages is
+     allocated the same way computeCA allocates its add-back. */
+  var treatyExempt = c.grossWages > 0 ? Math.round(c.exemptAmt * (num(d.stWages) / c.grossWages)) : 0;
+  var maIncome = num(d.stWages) + num(d.scholarshipTaxable) - treatyExempt;
+  var totalIncome = c.line1z + c.line8;              /* federal wages after the treaty exclusion, plus scholarship */
   var ratio = totalIncome > 0 ? Math.min(1, maIncome / totalIncome) : 0;
   var ficaDed = Math.min(mar.ficaDeductionCap, num(d.ssTaxW2) + num(d.medTaxW2)); /* MA line 15a deduction */
   var afterDed = Math.max(0, maIncome - ficaDed);
@@ -559,6 +593,7 @@ function computeMA(d, c) {
   var tax = Math.round(taxable * mar.rate);
   var pay = num(d.stWithheld);
   return { maIncome: maIncome, totalIncome: totalIncome, ratio: ratio, ficaDed: ficaDed, afterDed: afterDed,
+    treatyExempt: treatyExempt,
     exemption: exemption, taxable: taxable, tax: tax, payments: pay,
     refund: pay > tax ? pay - tax : 0, owed: tax > pay ? tax - pay : 0 };
 }
